@@ -33,6 +33,22 @@ defmodule PhNx.Distance do
   end
 
   @doc """
+  Compute the enclosing radius of a distance matrix: the smallest ε at which some point
+  is within distance ε of all other points.
+
+  Formula: min over all rows of (max over all columns).
+
+  Above this scale no new topology can appear, so the Vietoris-Rips filtration can be
+  safely truncated here.
+  """
+  def enclosing_radius(dist_matrix) do
+    dist_matrix
+    |> Nx.reduce_max(axes: [1])
+    |> Nx.reduce_min()
+    |> Nx.to_number()
+  end
+
+  @doc """
   Extract the upper-triangular entries of a distance matrix as `{i, j, dist}` triples,
   sorted by distance ascending.
   """

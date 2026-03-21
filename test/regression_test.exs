@@ -13,6 +13,18 @@ defmodule PhNx.RegressionTest do
 
   defp result, do: PhNx.compute(load_fixture(), max_dim: 2)
 
+  test "enclosing radius threshold: simplex count is reduced vs unthresholded filtration" do
+    pts = load_fixture()
+    dist = PhNx.Distance.euclidean(pts)
+    radius = PhNx.Distance.enclosing_radius(dist)
+    filt = PhNx.Filtration.build(dist, 2)
+    thresholded = Enum.filter(filt, fn %{birth: b} -> b <= radius end)
+    # Threshold should cut at least some simplices (unthresholded is 20,875)
+    assert length(thresholded) < length(filt)
+    # Threshold matches ripser's reported enclosing radius of ~2.84927
+    assert_in_delta radius, 2.84927, 1.0e-4
+  end
+
   test "H0: 49 finite pairs (one per merge)" do
     h0_pairs = result().pairs |> Enum.filter(fn {d, _, _} -> d == 0 end)
     assert length(h0_pairs) == 49
