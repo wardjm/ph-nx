@@ -27,6 +27,20 @@ defmodule PhNxTest do
     end
   end
 
+  describe "Distance.enclosing_radius/1" do
+    test "two points: radius equals their distance" do
+      pts = Nx.tensor([[0.0, 0.0], [5.0, 0.0]])
+      d = Distance.euclidean(pts)
+      assert_in_delta Distance.enclosing_radius(d), 5.0, 1.0e-9
+    end
+
+    test "unit square: radius equals diagonal (sqrt 2)" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      assert_in_delta Distance.enclosing_radius(d), :math.sqrt(2), 1.0e-9
+    end
+  end
+
   describe "Distance.sorted_edges/1" do
     test "returns edges sorted by length" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])

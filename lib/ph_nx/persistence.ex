@@ -34,11 +34,13 @@ defmodule PhNx.Persistence do
   """
   def compute(points, opts \\ []) do
     max_dim = Keyword.get(opts, :max_dim, 2)
-    threshold = Keyword.get(opts, :threshold, :infinity)
 
     points = if is_list(points), do: Nx.tensor(points, type: :f64), else: points
 
     dist = Distance.euclidean(points)
+
+    threshold =
+      Keyword.get_lazy(opts, :threshold, fn -> Distance.enclosing_radius(dist) end)
 
     filtration =
       dist
