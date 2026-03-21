@@ -169,6 +169,21 @@ defmodule PhNxTest do
       assert result.essential == [0]
     end
 
+    test "clearing: every birth column is absent from the reduced map" do
+      # For any pair (i, j), column i is pre-cleared after the pair is claimed.
+      # This holds for H0 pairs (vertex birth, empty column) and for H1 pairs
+      # (edge birth, non-empty column) — the edge column must be gone.
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      {bnd, _} = BoundaryMatrix.build(f)
+      %{pairs: pairs, reduced: reduced} = Reduction.reduce(bnd, length(f))
+      Enum.each(pairs, fn {i, _j} ->
+        refute Map.has_key?(reduced, i),
+               "birth column #{i} should be cleared after pairing"
+      end)
+    end
+
     test "two isolated vertices: one edge pair kills one H0 class" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)

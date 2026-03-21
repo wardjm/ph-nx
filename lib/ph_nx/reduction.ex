@@ -57,7 +57,10 @@ defmodule PhNx.Reduction do
       low ->
         case Map.get(pivot_col, low) do
           nil ->
-            # This pivot row is free — record (low, j) as a persistence pair
+            # This pivot row is free — record (low, j) as a persistence pair.
+            # Clearing lemma: column `low` will reduce to zero when reached,
+            # so remove it now to skip that work entirely (O(1) saving per pair).
+            boundary = Map.delete(boundary, low)
             {boundary, Map.put(pivot_col, low, j), [{low, j} | pairs]}
 
           i ->
