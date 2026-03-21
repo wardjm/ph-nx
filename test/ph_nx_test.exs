@@ -1,0 +1,269 @@
+defmodule PhNxTest do
+  use ExUnit.Case, async: true
+
+  alias PhNx.{Distance, Filtration, BoundaryMatrix, Reduction, Persistence}
+
+  # ── Distance ────────────────────────────────────────────────────────────────
+
+  describe "Distance.euclidean/1" do
+    test "3-point right triangle" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      assert Nx.shape(d) == {3, 3}
+
+      mat = Nx.to_list(d)
+      assert Enum.at(Enum.at(mat, 0), 0) == 0.0
+      assert_in_delta Enum.at(Enum.at(mat, 0), 1), 1.0, 1.0e-9
+      assert_in_delta Enum.at(Enum.at(mat, 0), 2), 1.0, 1.0e-9
+      assert_in_delta Enum.at(Enum.at(mat, 1), 2), :math.sqrt(2), 1.0e-9
+    end
+
+    test "symmetry" do
+      pts = Nx.tensor([[0.0, 0.0], [3.0, 4.0]])
+      d = Distance.euclidean(pts)
+      mat = Nx.to_list(d)
+      assert_in_delta Enum.at(Enum.at(mat, 0), 1), 5.0, 1.0e-9
+      assert_in_delta Enum.at(Enum.at(mat, 1), 0), 5.0, 1.0e-9
+    end
+  end
+
+  describe "Distance.sorted_edges/1" do
+    test "returns edges sorted by length" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      edges = Distance.sorted_edges(d)
+      dists = Enum.map(edges, fn {_, _, x} -> x end)
+      assert dists == Enum.sort(dists)
+    end
+  end
+
+  # ── Filtration ───────────────────────────────────────────────────────────────
+
+  describe "Filtration.build/2" do
+    test "3 points, max_dim=1 produces 3 vertices + 3 edges" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      assert length(f) == 6
+      assert Enum.count(f, &(&1.dim == 0)) == 3
+      assert Enum.count(f, &(&1.dim == 1)) == 3
+    end
+
+    test "simplices are sorted: birth non-decreasing" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      births = Enum.map(f, & &1.birth)
+      assert births == Enum.sort(births)
+    end
+
+    test "indices are 0-based and contiguous" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      indices = Enum.map(f, & &1.index)
+      assert indices == Enum.to_list(0..(length(f) - 1))
+    end
+
+    test "vertex birth is 0" do
+      pts = Nx.tensor([[0.0, 0.0], [5.0, 5.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      vertices = Enum.filter(f, &(&1.dim == 0))
+      assert Enum.all?(vertices, &(&1.birth == 0.0))
+    end
+  end
+
+  describe "Filtration.faces/1" do
+    test "faces of a triangle are 3 edges" do
+      simplex = %{vertices: [0, 1, 2], dim: 2, birth: 1.0, index: 5}
+      faces = Filtration.faces(simplex)
+      assert length(faces) == 3
+      assert [1, 2] in faces
+      assert [0, 2] in faces
+      assert [0, 1] in faces
+    end
+
+    test "faces of an edge are 2 vertices" do
+      simplex = %{vertices: [2, 4], dim: 1, birth: 0.5, index: 3}
+      faces = Filtration.faces(simplex)
+      assert [[4], [2]] == faces
+    end
+  end
+
+  # ── BoundaryMatrix ───────────────────────────────────────────────────────────
+
+  describe "BoundaryMatrix.build/1" do
+    test "vertices have no boundary" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 0)
+      {bnd, _} = BoundaryMatrix.build(f)
+      assert map_size(bnd) == 0
+    end
+
+    test "edge boundary has exactly 2 rows set" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      {bnd, _} = BoundaryMatrix.build(f)
+
+      edge_simplices = Enum.filter(f, &(&1.dim == 1))
+
+      Enum.each(edge_simplices, fn %{index: j} ->
+        col = Map.get(bnd, j, MapSet.new())
+        assert MapSet.size(col) == 2
+      end)
+    end
+  end
+
+  describe "BoundaryMatrix.lowest/2" do
+    test "returns max row index" do
+      bnd = %{3 => MapSet.new([1, 5, 2])}
+      assert BoundaryMatrix.lowest(bnd, 3) == 5
+    end
+
+    test "returns nil for missing column" do
+      assert BoundaryMatrix.lowest(%{}, 0) == nil
+    end
+  end
+
+  describe "BoundaryMatrix.add_columns/3" do
+    test "XOR of identical columns gives empty column (removed from map)" do
+      bnd = %{0 => MapSet.new([1, 3]), 1 => MapSet.new([1, 3])}
+      result = BoundaryMatrix.add_columns(bnd, 0, 1)
+      refute Map.has_key?(result, 0)
+    end
+
+    test "XOR produces symmetric difference" do
+      bnd = %{0 => MapSet.new([1, 2, 3]), 1 => MapSet.new([2, 3, 4])}
+      result = BoundaryMatrix.add_columns(bnd, 0, 1)
+      assert MapSet.equal?(Map.fetch!(result, 0), MapSet.new([1, 4]))
+    end
+  end
+
+  # ── Reduction ────────────────────────────────────────────────────────────────
+
+  describe "Reduction.reduce/2" do
+    test "single vertex has no pairs, one essential class" do
+      pts = Nx.tensor([[0.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 0)
+      {bnd, _} = BoundaryMatrix.build(f)
+      result = Reduction.reduce(bnd, length(f))
+      assert result.pairs == []
+      assert result.essential == [0]
+    end
+
+    test "two isolated vertices: one edge pair kills one H0 class" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      {bnd, _} = BoundaryMatrix.build(f)
+      result = Reduction.reduce(bnd, length(f))
+      assert length(result.pairs) == 1
+      assert length(result.essential) == 1
+    end
+  end
+
+  # ── Persistence (integration) ────────────────────────────────────────────────
+
+  describe "Persistence.compute/2" do
+    test "single point: 1 essential H0, no other features" do
+      pts = Nx.tensor([[0.0, 0.0]])
+      result = Persistence.compute(pts)
+      assert result.essential == [{0, 0.0}]
+      assert result.pairs == []
+    end
+
+    test "two separate points: 1 essential H0, 1 finite H0" do
+      pts = Nx.tensor([[0.0, 0.0], [10.0, 0.0]])
+      result = Persistence.compute(pts)
+      h0_essential = Enum.filter(result.essential, fn {d, _} -> d == 0 end)
+      h0_pairs = Enum.filter(result.pairs, fn {d, _, _} -> d == 0 end)
+      assert length(h0_essential) == 1
+      assert length(h0_pairs) == 1
+    end
+
+    test "unit square: 1 essential H0, at least 1 finite H1 loop" do
+      pts =
+        Nx.tensor([
+          [0.0, 0.0],
+          [1.0, 0.0],
+          [1.0, 1.0],
+          [0.0, 1.0]
+        ])
+
+      result = Persistence.compute(pts, max_dim: 2)
+
+      h0_essential = Enum.filter(result.essential, fn {d, _} -> d == 0 end)
+      h1_finite = Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)
+
+      assert length(h0_essential) == 1
+      assert length(h1_finite) >= 1
+    end
+
+    test "equilateral triangle: H1 loop has zero persistence (born and killed simultaneously)" do
+      # All edges and the triangle appear at the same ε, so birth == death
+      s = :math.sqrt(3) / 2
+
+      pts =
+        Nx.tensor([
+          [0.0, 0.0],
+          [1.0, 0.0],
+          [0.5, s]
+        ])
+
+      result = Persistence.compute(pts, max_dim: 2)
+      # No finite H1 pair with birth < death
+      h1_finite = Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)
+      assert h1_finite == []
+      # 1 connected component survives
+      assert length(Enum.filter(result.essential, fn {d, _} -> d == 0 end)) == 1
+    end
+
+    test "unit square: H1 loop born at 1.0, killed at sqrt(2)" do
+      # The 4 boundary edges (length 1) form a loop; diagonals (length sqrt(2))
+      # enable triangles that fill the loop.
+      pts =
+        Nx.tensor([
+          [0.0, 0.0],
+          [1.0, 0.0],
+          [1.0, 1.0],
+          [0.0, 1.0]
+        ])
+
+      result = Persistence.compute(pts, max_dim: 2)
+      h1_finite = Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)
+
+      assert length(h1_finite) == 1
+      [{1, birth, death}] = h1_finite
+      assert_in_delta birth, 1.0, 1.0e-9
+      assert_in_delta death, :math.sqrt(2), 1.0e-9
+    end
+
+    test "betti_numbers returns correct map" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      result = Persistence.compute(pts)
+      betti = Persistence.betti_numbers(result)
+      assert Map.get(betti, 0, 0) == 1
+    end
+
+    test "diagram is union of finite pairs and essential classes" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      result = Persistence.compute(pts)
+      expected_count = length(result.pairs) + length(result.essential)
+      assert length(result.diagram) == expected_count
+    end
+  end
+
+  describe "Persistence.most_persistent/2" do
+    test "returns pairs sorted by persistence descending" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      result = Persistence.compute(pts)
+      top = Persistence.most_persistent(result, 5)
+      persistences = Enum.map(top, fn {_, _, _, p} -> p end)
+      assert persistences == Enum.sort(persistences, :desc)
+    end
+  end
+end
