@@ -23,7 +23,10 @@ defmodule PhNx.Persistence do
   Options:
     - `max_dim` (integer, default 2): maximum simplex dimension in the filtration.
       To compute Hₖ you need simplices up to dimension k+1.
-    - `threshold` (float, default :infinity): ignore simplices born after this value.
+    - `threshold` (float, default: enclosing radius of the point cloud): ignore simplices
+      born after this filtration value. The enclosing radius is the smallest value at which
+      all points are connected, so the default produces the most topologically meaningful
+      filtration. Pass `threshold: :infinity` to include all simplices regardless of scale.
 
   Returns a map:
     %{

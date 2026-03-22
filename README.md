@@ -68,7 +68,7 @@ PhNx.most_persistent(result, 5) # => [{dim, birth, death, persistence}, ...]
 | Option | Default | Description |
 |---|---|---|
 | `:max_dim` | `2` | Maximum simplex dimension. To detect Hₖ features you need simplices up to dimension k+1. |
-| `:threshold` | `:infinity` | Ignore simplices born after this filtration value. |
+| `:threshold` | enclosing radius | Ignore simplices born after this filtration value. The enclosing radius is the smallest value at which all points are connected. Pass `:infinity` to include all simplices. |
 
 ## Modules
 
@@ -83,5 +83,5 @@ PhNx.most_persistent(result, 5) # => [{dim, birth, death, persistence}, ...]
 
 ## Limitations & future work
 
-- **Scale**: reduction is O(m³) worst-case in the number of simplices. For point clouds larger than ~100 points without a threshold, runtime grows quickly. Pass `threshold: t` to `compute/2` to limit the filtration.
+- **Scale**: reduction is O(m³) worst-case in the number of simplices. The default threshold (enclosing radius) limits the filtration automatically, but passing `threshold: :infinity` on large point clouds will grow quickly.
 - **Sparse distance input**: currently only Euclidean point clouds are supported; sparse or precomputed distance matrices could be added.
