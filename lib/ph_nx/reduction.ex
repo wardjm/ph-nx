@@ -63,7 +63,9 @@ defmodule PhNx.Reduction do
       |> Filtration.faces()
       |> Enum.reduce(acc, fn face_verts, a ->
         case Map.get(vertex_to_idx, face_verts) do
-          nil -> a
+          nil ->
+            a
+
           face_idx ->
             Map.update(a, face_idx, [simplex.index], &[simplex.index | &1])
         end
@@ -87,14 +89,15 @@ defmodule PhNx.Reduction do
     # Track births+deaths to skip, and death columns to protect from clearing.
     {ap_pivot_col, ap_resolved, ap_deaths} =
       Enum.reduce(ap_pairs, {%{}, MapSet.new(), MapSet.new()}, fn {low, j}, {pc, res, deaths} ->
-        {Map.put(pc, low, j),
-         res |> MapSet.put(low) |> MapSet.put(j),
-         MapSet.put(deaths, j)}
+        {Map.put(pc, low, j), res |> MapSet.put(low) |> MapSet.put(j), MapSet.put(deaths, j)}
       end)
 
     # pivot_col: maps a row index (pivot) to the column index that owns it
     {reduced, pivot_col, pairs} =
-      Enum.reduce(0..(filtration_size - 1), {boundary, ap_pivot_col, ap_pairs}, fn j, {bnd, pivot_col, pairs} ->
+      Enum.reduce(0..(filtration_size - 1), {boundary, ap_pivot_col, ap_pairs}, fn j,
+                                                                                   {bnd,
+                                                                                    pivot_col,
+                                                                                    pairs} ->
         if MapSet.member?(ap_resolved, j) do
           {bnd, pivot_col, pairs}
         else
@@ -133,6 +136,7 @@ defmodule PhNx.Reduction do
               if MapSet.member?(protected, low),
                 do: boundary,
                 else: Map.delete(boundary, low)
+
             {boundary, Map.put(pivot_col, low, j), [{low, j} | pairs]}
 
           i ->
