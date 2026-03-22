@@ -1,34 +1,48 @@
 # ph-nx Performance Baseline
 
-Recorded before any performance optimisations (issues #3–#6).
-
 **Dataset**: `test/fixtures/o3_50.txt` — 50 points, 9 dimensions
-**Settings**: `max_dim: 2`
-**Simplices**: 20,875 (vertices + edges + triangles, no threshold)
-**Elixir**: 1.19.5 / OTP 27 / WSL2 x86-64
+**Settings**: `max_dim: 2`, threshold: enclosing radius (default)
+**Elixir**: 1.18.4 / OTP 27 / Linux 6.8
 
-## Per-phase timing
+## Per-phase timing (BinaryBackend)
 
-| Phase            | BinaryBackend | EXLA (CPU) |
-|------------------|---------------|------------|
-| Distance matrix  | 18.8 ms       | 0.9 ms     |
-| Filtration build | 33.0 ms       | 36.3 ms    |
-| Boundary matrix  | 24.3 ms       | 28.4 ms    |
-| Reduction        | 547.3 ms      | 546.3 ms   |
-| **Total**        | **623.4 ms**  | **611.9 ms** |
+| Phase            | Time      |
+|------------------|-----------|
+| Distance matrix  | 57.5 ms   |
+| Filtration build | 24.7 ms   |
+| Boundary matrix  | 26.4 ms   |
+| Reduction        | 519.3 ms  |
+| **Total**        | **627.9 ms** |
 
 ## Multi-run averages (5 runs, after 2 warm-up)
 
 | Backend       | Average    | Min        |
 |---------------|------------|------------|
-| BinaryBackend | 641.7 ms   | 631.8 ms   |
-| EXLA (CPU)    | 604.8 ms   | 576.8 ms   |
+| BinaryBackend | 627.4 ms   | 610.0 ms   |
+| EXLA (CPU)    | —          | —          |
+
+EXLA timings not recorded: XLA binaries unavailable in this environment.
 
 ## Observations
 
-- **Reduction dominates**: 547 ms / 623 ms = **88% of total runtime**
-- **EXLA wins on distance matrix only**: 0.9 ms vs 18.8 ms (~21×), but that phase is only 3% of total
-- **No threshold applied**: all C(50,3) = 19,600 triangles are included regardless of birth time; this is the primary driver of simplex count
+- **Simplices**: 16,598 — lower than the original baseline (20,875) because the
+  enclosing-radius threshold is now applied by default (added in PR #3)
+- **Reduction dominates**: 519 ms / 628 ms = **83% of total runtime**
+- **Apparent-pairs optimisation now active in benchmark**: phase breakdown previously
+  called `Reduction.reduce/2` (bypassing apparent-pairs); corrected to `reduce/3`
+  in this baseline (closes #27)
+
+## Pre-optimisation reference (original baseline, issues #3–#6)
+
+Recorded before threshold defaulting and apparent-pairs; 20,875 simplices, no threshold.
+
+| Phase            | BinaryBackend | EXLA (CPU)   |
+|------------------|---------------|--------------|
+| Distance matrix  | 18.8 ms       | 0.9 ms       |
+| Filtration build | 33.0 ms       | 36.3 ms      |
+| Boundary matrix  | 24.3 ms       | 28.4 ms      |
+| Reduction        | 547.3 ms      | 546.3 ms     |
+| **Total**        | **623.4 ms**  | **611.9 ms** |
 
 ## Correctness baseline (ripser --format point-cloud --dim 1)
 
