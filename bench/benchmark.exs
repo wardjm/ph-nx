@@ -31,8 +31,14 @@ defmodule Bench do
     IO.puts("#{String.duplicate("═", 60)}\n")
 
     for {label, backend} <- [{"BinaryBackend", Nx.BinaryBackend}, {"EXLA (CPU)", EXLA.Backend}] do
-      points = Nx.tensor(raw, type: :f64, backend: backend)
-      run_backend(label, points, max_dim)
+      try do
+        points = Nx.tensor(raw, type: :f64, backend: backend)
+        run_backend(label, points, max_dim)
+      rescue
+        e in [UndefinedFunctionError, RuntimeError] ->
+          IO.puts("── #{label} ──────────────────────────────────────────")
+          IO.puts("  skipped: #{Exception.message(e)}\n")
+      end
     end
   end
 
@@ -51,7 +57,7 @@ defmodule Bench do
     t2 = ts()
     {bnd, _} = PhNx.BoundaryMatrix.build(filt)
     t3 = ts()
-    result = PhNx.Reduction.reduce(bnd, length(filt))
+    result = PhNx.Reduction.reduce(bnd, length(filt), filt)
     t4 = ts()
 
     pairs = length(result.pairs)
