@@ -5,7 +5,7 @@ defmodule PhNx.MixProject do
     [
       app: :ph_nx,
       version: "0.1.0",
-      elixir: "~> 1.19",
+      elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -22,7 +22,7 @@ defmodule PhNx.MixProject do
   defp deps do
     [
       {:nx, "~> 0.9"},
-      {:exla, "~> 0.11.0"}
+      {:exla, "~> 0.11.0", runtime: Mix.env() != :test}
     ]
   end
 end
