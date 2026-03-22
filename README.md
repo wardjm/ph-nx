@@ -110,6 +110,8 @@ Persistence pairs + essential classes
 - **Vietoris-Rips filtration**: a simplex σ = {v₀, …, vₖ} is born at `max{ dist(vᵢ, vⱼ) }` — the diameter of its vertex set. Simplices are processed in birth order.
 - **Boundary matrix**: the m×m matrix ∂ over F₂ where ∂[i,j] = 1 if simplex i is a codimension-1 face of simplex j. Stored sparsely as `%{col → MapSet of rows}`.
 - **Column reduction**: reduce ∂ by left-to-right column additions (XOR). A pivot pair (i, j) means simplex i creates a homology class that simplex j destroys. Unpivoted simplices with zero columns are essential (infinite bars).
+- **Apparent pairs**: a pair (σ, τ) is apparent when σ is the highest-indexed face of τ and τ is the lowest-indexed cofacet of σ. Such pairs are resolved in O(1) before the main reduction loop — no column operations needed.
+- **Clearing lemma**: once a pair (σ, τ) is recorded, column σ is deleted from the boundary matrix — it will never be needed for further elimination.
 - **Persistence pair** (i, j): birth = filtration value of simplex i, death = filtration value of simplex j. The homology dimension is `dim(i)`.
 
 ## Validation vs ripser
@@ -120,7 +122,7 @@ Tested against [ripser](https://github.com/Ripser/ripser) on the SO(3) point clo
 - **51 H₁ pairs**: exact match ✓
 
 ```
-../ripser/ripser --format point-cloud --dim 1 o3_50.txt
+ripser --format point-cloud --dim 1 o3_50.txt
 ```
 
 ## Performance
@@ -147,7 +149,7 @@ EXLA accelerates the distance matrix computation ~19× but the bottleneck is the
 
 ## Limitations & future work
 
-- **Scale**: the naive reduction is O(m³) worst-case in the number of simplices m. For point clouds larger than ~100 points without a threshold, runtime grows quickly.
+- **Scale**: reduction is O(m³) worst-case in the number of simplices m. For point clouds larger than ~100 points without a threshold, runtime grows quickly.
 - **Threshold**: pass `threshold: t` to `compute/2` to limit the filtration and keep runtimes manageable.
-- **Parallel reduction**: parallel persistence algorithms (e.g. apparent pairs, cohomology) could bring the reduction step onto Nx tensors and benefit from EXLA/GPU.
+- **Nx-accelerated filtration**: simplex birth-time computation is pure Elixir; moving it into Nx tensor ops could accelerate filtration construction.
 - **Sparse distance input**: currently only Euclidean point clouds are supported; sparse or precomputed distance matrices could be added.
