@@ -272,6 +272,7 @@ defmodule PhNxTest do
       f = Filtration.build(d, 2)
       {bnd, _} = BoundaryMatrix.build(f)
       %{pairs: pairs, reduced: reduced} = Reduction.reduce(bnd, length(f))
+
       Enum.each(pairs, fn {i, _j} ->
         refute Map.has_key?(reduced, i),
                "birth column #{i} should be cleared after pairing"
