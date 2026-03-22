@@ -38,6 +38,10 @@ defmodule PhNx.Persistence do
 
     points = if is_list(points), do: Nx.tensor(points, type: :f64), else: points
 
+    if Nx.axis_size(points, 0) == 0 do
+      raise ArgumentError, "point cloud must be non-empty"
+    end
+
     dist = Distance.euclidean(points)
 
     threshold =
