@@ -29,7 +29,8 @@ defmodule PhNx.Filtration do
 
     # Extract the distance matrix into a flat tuple for O(1) pair lookups.
     # dist_flat[i*n + j] == dist(i, j). Nx.to_list handles EXLA device-to-host
-    # transfer; the subsequent Elixir operations are allocation-free per simplex.
+    # transfer. The Enum.concat + List.to_tuple setup is O(n²) but runs once;
+    # each per-simplex birth lookup is then O(1) via elem/2 with no allocation.
     dist_flat =
       dist_matrix
       |> Nx.to_list()
