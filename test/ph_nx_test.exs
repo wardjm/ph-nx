@@ -395,6 +395,27 @@ defmodule PhNxTest do
       assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts)
     end
 
+    test "negative max_dim raises ArgumentError" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      assert_raise ArgumentError, ~r/max_dim must be a non-negative integer/, fn ->
+        Persistence.compute(pts, max_dim: -1)
+      end
+    end
+
+    test "float max_dim raises ArgumentError" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      assert_raise ArgumentError, ~r/max_dim must be a non-negative integer/, fn ->
+        Persistence.compute(pts, max_dim: 1.5)
+      end
+    end
+
+    test "max_dim of 0 is valid and returns only H0" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      result = Persistence.compute(pts, max_dim: 0)
+      assert Enum.all?(result.essential, fn {d, _} -> d == 0 end)
+      assert Enum.all?(result.pairs, fn {d, _, _} -> d == 0 end)
+    end
+
     test "unknown option key raises ArgumentError" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       assert_raise ArgumentError, fn -> Persistence.compute(pts, max_dims: 2) end
