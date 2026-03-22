@@ -51,15 +51,20 @@ defmodule PhNx.Distance do
   @doc """
   Extract the upper-triangular entries of a distance matrix as `{i, j, dist}` triples,
   sorted by distance ascending.
+
+  Useful as a user-facing utility for inspecting the edge order of a Vietoris-Rips
+  filtration without building the full filtration.
+
+  Uses a flat-tuple representation for O(1) per-pair access, giving O(n²) total
+  rather than the O(n³) cost of nested list traversals.
   """
   def sorted_edges(dist_matrix) do
     n = Nx.axis_size(dist_matrix, 0)
-    mat = Nx.to_list(dist_matrix)
+    dist_flat = dist_matrix |> Nx.to_list() |> Enum.concat() |> List.to_tuple()
 
     for i <- 0..(n - 2),
         j <- (i + 1)..(n - 1) do
-      d = mat |> Enum.at(i) |> Enum.at(j)
-      {i, j, d}
+      {i, j, elem(dist_flat, i * n + j)}
     end
     |> Enum.sort_by(fn {_, _, d} -> d end)
   end
