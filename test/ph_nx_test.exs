@@ -156,7 +156,67 @@ defmodule PhNxTest do
     end
   end
 
+  # ── Apparent pairs ───────────────────────────────────────────────────────────
+
+  describe "Reduction.apparent_pairs/2" do
+    test "detects apparent pair in two-point filtration" do
+      # [0](idx 0), [1](idx 1), [0,1](idx 2)
+      # lowest([0,1]) = 1; highest coface of [1] = 2 → apparent pair (1, 2)
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      {bnd, _} = BoundaryMatrix.build(f)
+      {pairs, _bnd2} = Reduction.apparent_pairs(bnd, f)
+      assert {1, 2} in pairs
+    end
+
+    test "returns empty when no apparent pairs exist" do
+      # Single vertex — no edges, no pairs possible
+      pts = Nx.tensor([[0.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 0)
+      {bnd, _} = BoundaryMatrix.build(f)
+      {pairs, _} = Reduction.apparent_pairs(bnd, f)
+      assert pairs == []
+    end
+
+    test "does not modify the boundary (columns needed for elimination)" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      {bnd, _} = BoundaryMatrix.build(f)
+      {[{_birth, death}], bnd2} = Reduction.apparent_pairs(bnd, f)
+      # Death column must be kept so other columns can eliminate against it
+      assert Map.has_key?(bnd2, death)
+      assert bnd == bnd2
+    end
+  end
+
   # ── Reduction ────────────────────────────────────────────────────────────────
+
+  describe "Reduction.reduce/3 (with apparent pairs)" do
+    test "produces same pairs and essential as reduce/2" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      {bnd, _} = BoundaryMatrix.build(f)
+      r2 = Reduction.reduce(bnd, length(f))
+      r3 = Reduction.reduce(bnd, length(f), f)
+      assert Enum.sort(r3.pairs) == Enum.sort(r2.pairs)
+      assert Enum.sort(r3.essential) == Enum.sort(r2.essential)
+    end
+
+    test "apparent pair is recorded directly in result (two-point filtration)" do
+      # Filtration: v0(0), v1(1), e01(2). Apparent pair: (1, 2).
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      {bnd, _} = BoundaryMatrix.build(f)
+      result = Reduction.reduce(bnd, length(f), f)
+      assert {1, 2} in result.pairs
+      assert 0 in result.essential
+    end
+  end
 
   describe "Reduction.reduce/2" do
     test "single vertex has no pairs, one essential class" do

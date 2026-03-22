@@ -50,7 +50,7 @@ defmodule PhNx.Persistence do
     {boundary, _filtration} = BoundaryMatrix.build(filtration)
 
     %{pairs: raw_pairs, essential: raw_essential} =
-      Reduction.reduce(boundary, length(filtration))
+      Reduction.reduce(boundary, length(filtration), filtration)
 
     # Map filtration indices back to (dim, birth) info
     idx_to_simplex = Map.new(filtration, fn s -> {s.index, s} end)
