@@ -17,6 +17,22 @@ defmodule PhNx.Persistence do
 
   alias PhNx.{Distance, Filtration, BoundaryMatrix, Reduction}
 
+  @typedoc "A finite persistence pair: {dimension, birth, death}."
+  @type pair :: {non_neg_integer(), float(), float()}
+
+  @typedoc "An essential (infinite) homology class: {dimension, birth}."
+  @type essential_class :: {non_neg_integer(), float()}
+
+  @typedoc "A diagram entry: finite pair or essential class extended to :infinity."
+  @type diagram_entry :: {non_neg_integer(), float(), float() | :infinity}
+
+  @typedoc "The result map returned by `compute/2`."
+  @type result :: %{
+          pairs: [pair()],
+          essential: [essential_class()],
+          diagram: [diagram_entry()]
+        }
+
   @doc """
   Compute persistent homology for a point cloud.
 
@@ -35,6 +51,7 @@ defmodule PhNx.Persistence do
       diagram:   [{dim, birth, death | :infinity}]  # union of pairs + essential
     }
   """
+  @spec compute(Nx.Tensor.t() | [[number()]], keyword()) :: result()
   def compute(points, opts \\ []) do
     opts = Keyword.validate!(opts, [:max_dim, :threshold])
     max_dim = Keyword.get(opts, :max_dim, 2)
@@ -107,6 +124,7 @@ defmodule PhNx.Persistence do
   @doc """
   Print a human-readable barcode summary.
   """
+  @spec print_barcode(result()) :: :ok
   def print_barcode(%{diagram: diagram}) do
     IO.puts("\nPersistence Barcode")
     IO.puts(String.duplicate("─", 50))
@@ -136,6 +154,7 @@ defmodule PhNx.Persistence do
   Return persistence pairs sorted by persistence (death - birth) descending.
   Useful for identifying the most significant topological features.
   """
+  @spec most_persistent(result(), pos_integer()) :: [{non_neg_integer(), float(), float(), float()}]
   def most_persistent(%{pairs: pairs}, n \\ 10) do
     pairs
     |> Enum.map(fn {dim, birth, death} -> {dim, birth, death, death - birth} end)
@@ -147,6 +166,7 @@ defmodule PhNx.Persistence do
   Compute Betti numbers from the essential classes.
   Returns a map `%{dimension => count}`.
   """
+  @spec betti_numbers(result()) :: %{optional(non_neg_integer()) => non_neg_integer()}
   def betti_numbers(%{essential: essential}) do
     essential
     |> Enum.group_by(fn {d, _} -> d end)
