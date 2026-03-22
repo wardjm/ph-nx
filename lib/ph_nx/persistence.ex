@@ -36,6 +36,10 @@ defmodule PhNx.Persistence do
     opts = Keyword.validate!(opts, [:max_dim, :threshold])
     max_dim = Keyword.get(opts, :max_dim, 2)
 
+    if not is_integer(max_dim) or max_dim < 0 do
+      raise ArgumentError, "max_dim must be a non-negative integer, got: #{inspect(max_dim)}"
+    end
+
     if points == [] or (is_list(points) and length(points) == 0) do
       raise ArgumentError, "point cloud must be non-empty"
     end
