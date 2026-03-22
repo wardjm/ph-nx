@@ -13,6 +13,9 @@ defmodule PhNx.Filtration do
       %{vertices: [integer], dim: integer, birth: float, index: integer}
 
   where `index` is the 0-based position in the sorted filtration.
+
+  Distance lookups use a flat tuple extracted from the Nx distance matrix, giving
+  O(1) access per pair via `elem/2` instead of O(n) nested `Enum.at` traversals.
   """
 
   @doc """
@@ -23,26 +26,16 @@ defmodule PhNx.Filtration do
   """
   def build(dist_matrix, max_dim \\ 2) do
     n = Nx.axis_size(dist_matrix, 0)
-    mat = Nx.to_list(dist_matrix)
 
-    # Build a fast lookup: row i as a list, then element access
-    rows = mat
-
-    simplex_birth = fn vertices ->
-      pairs =
-        for i <- vertices, j <- vertices, i < j, do: {i, j}
-
-      case pairs do
-        [] ->
-          0.0
-
-        _ ->
-          Enum.reduce(pairs, 0.0, fn {i, j}, acc ->
-            d = rows |> Enum.at(i) |> Enum.at(j)
-            max(acc, d)
-          end)
-      end
-    end
+    # Extract the distance matrix into a flat tuple for O(1) pair lookups.
+    # dist_flat[i*n + j] == dist(i, j). Nx.to_list handles EXLA device-to-host
+    # transfer. The Enum.concat + List.to_tuple setup is O(n²) but runs once;
+    # each per-simplex birth lookup is then O(1) via elem/2 with no allocation.
+    dist_flat =
+      dist_matrix
+      |> Nx.to_list()
+      |> Enum.concat()
+      |> List.to_tuple()
 
     vertices = for i <- 0..(n - 1), do: [i]
 
@@ -66,11 +59,14 @@ defmodule PhNx.Filtration do
 
     all_simplices
     |> Enum.map(fn vertices ->
-      %{
-        vertices: vertices,
-        dim: length(vertices) - 1,
-        birth: simplex_birth.(vertices)
-      }
+      # Compute birth = max pairwise distance via O(1) tuple lookup.
+      # The `for ... reduce` accumulates the max without intermediate lists.
+      birth =
+        for i <- vertices, j <- vertices, i < j, reduce: 0.0 do
+          acc -> max(acc, elem(dist_flat, i * n + j))
+        end
+
+      %{vertices: vertices, dim: length(vertices) - 1, birth: birth}
     end)
     |> Enum.sort_by(fn %{birth: b, dim: d, vertices: v} -> {b, d, v} end)
     |> Enum.with_index()

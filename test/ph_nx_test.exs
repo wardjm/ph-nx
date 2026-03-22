@@ -79,12 +79,42 @@ defmodule PhNxTest do
       assert indices == Enum.to_list(0..(length(f) - 1))
     end
 
+    test "single point: one vertex, birth 0, nothing else" do
+      pts = Nx.tensor([[0.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      assert length(f) == 1
+      assert hd(f) == %{vertices: [0], dim: 0, birth: 0.0, index: 0}
+    end
+
     test "vertex birth is 0" do
       pts = Nx.tensor([[0.0, 0.0], [5.0, 5.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
       vertices = Enum.filter(f, &(&1.dim == 0))
       assert Enum.all?(vertices, &(&1.birth == 0.0))
+    end
+
+    test "edge birth is the distance between its endpoints" do
+      # Points: (0,0), (3,4), (0,1)
+      # Distances: d(0,1)=5.0, d(0,2)=1.0, d(1,2)=sqrt((3-0)²+(4-1)²)=sqrt(18)
+      pts = Nx.tensor([[0.0, 0.0], [3.0, 4.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      # idx maps vertex-list key to birth value (Map key access via [])
+      idx = Map.new(f, fn s -> {s.vertices, s.birth} end)
+      assert_in_delta idx[[0, 1]], 5.0, 1.0e-9
+      assert_in_delta idx[[0, 2]], 1.0, 1.0e-9
+      assert_in_delta idx[[1, 2]], :math.sqrt(9 + 9), 1.0e-9
+    end
+
+    test "triangle birth is the max edge length (diameter of vertex set)" do
+      # Right triangle: legs 1.0 and 1.0, hypotenuse sqrt(2)
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      tri = Enum.find(f, &(&1.vertices == [0, 1, 2]))
+      assert_in_delta tri.birth, :math.sqrt(2), 1.0e-9
     end
   end
 
