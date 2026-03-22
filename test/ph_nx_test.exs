@@ -190,6 +190,40 @@ defmodule PhNxTest do
     end
   end
 
+  describe "BoundaryMatrix.to_tensor/2" do
+    test "empty boundary produces zero matrix" do
+      t = BoundaryMatrix.to_tensor(%{}, 3)
+      assert Nx.shape(t) == {3, 3}
+      assert Nx.to_list(t) == [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+    end
+
+    test "single entry sets correct cell" do
+      bnd = %{2 => MapSet.new([0, 1])}
+      t = BoundaryMatrix.to_tensor(bnd, 3)
+      mat = Nx.to_list(t)
+      # row 0, col 2 and row 1, col 2 should be 1
+      assert Enum.at(Enum.at(mat, 0), 2) == 1
+      assert Enum.at(Enum.at(mat, 1), 2) == 1
+      # all other cells zero
+      assert Enum.at(Enum.at(mat, 2), 2) == 0
+    end
+
+    test "matches boundary built from a real filtration" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      {bnd, _} = BoundaryMatrix.build(f)
+      m = length(f)
+      t = BoundaryMatrix.to_tensor(bnd, m)
+      assert Nx.shape(t) == {m, m}
+      # Each edge column should have exactly 2 ones
+      Enum.each(Enum.filter(f, &(&1.dim == 1)), fn %{index: j} ->
+        col = t[[.., j]] |> Nx.to_list()
+        assert Enum.sum(col) == 2
+      end)
+    end
+  end
+
   # ── Apparent pairs ───────────────────────────────────────────────────────────
 
   describe "Reduction.apparent_pairs/2" do
