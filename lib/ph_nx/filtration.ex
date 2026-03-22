@@ -18,12 +18,21 @@ defmodule PhNx.Filtration do
   O(1) access per pair via `elem/2` instead of O(n) nested `Enum.at` traversals.
   """
 
+  @typedoc "A simplex in the filtration, with its vertex set, dimension, birth time, and index."
+  @type simplex :: %{
+          vertices: [non_neg_integer()],
+          dim: non_neg_integer(),
+          birth: float(),
+          index: non_neg_integer()
+        }
+
   @doc """
   Build a Vietoris-Rips filtration up to `max_dim` from a precomputed distance matrix.
 
   `dist_matrix` is an n×n Nx tensor (or list-of-lists). `max_dim` controls the maximum
   simplex dimension included (0 = vertices only, 1 = edges, 2 = triangles, etc.).
   """
+  @spec build(Nx.Tensor.t(), non_neg_integer()) :: [simplex()]
   def build(dist_matrix, max_dim \\ 2) do
     n = Nx.axis_size(dist_matrix, 0)
 
@@ -76,6 +85,7 @@ defmodule PhNx.Filtration do
   @doc """
   Return all (k-1)-faces of a k-simplex (as sorted vertex lists).
   """
+  @spec faces(simplex()) :: [[non_neg_integer()]]
   def faces(%{vertices: vertices}) do
     vertices
     |> Enum.with_index()
@@ -87,6 +97,7 @@ defmodule PhNx.Filtration do
   @doc """
   Build a lookup map from vertex list to filtration index.
   """
+  @spec index_map([simplex()]) :: %{optional([non_neg_integer()]) => non_neg_integer()}
   def index_map(filtration) do
     Map.new(filtration, fn %{vertices: v, index: i} -> {v, i} end)
   end

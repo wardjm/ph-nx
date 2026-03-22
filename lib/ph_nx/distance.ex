@@ -16,6 +16,7 @@ defmodule PhNx.Distance do
       iex> PhNx.Distance.euclidean(points)
       #Nx.Tensor<...>
   """
+  @spec euclidean(Nx.Tensor.t()) :: Nx.Tensor.t()
   def euclidean(points) do
     points = Nx.as_type(points, :f64)
     euclidean_n(points)
@@ -41,6 +42,7 @@ defmodule PhNx.Distance do
   Above this scale no new topology can appear, so the Vietoris-Rips filtration can be
   safely truncated here.
   """
+  @spec enclosing_radius(Nx.Tensor.t()) :: float()
   def enclosing_radius(dist_matrix) do
     dist_matrix
     |> Nx.reduce_max(axes: [1])
@@ -58,6 +60,7 @@ defmodule PhNx.Distance do
   Uses a flat-tuple representation for O(1) per-pair access, giving O(n²) total
   rather than the O(n³) cost of nested list traversals.
   """
+  @spec sorted_edges(Nx.Tensor.t()) :: [{non_neg_integer(), non_neg_integer(), float()}]
   def sorted_edges(dist_matrix) do
     n = Nx.axis_size(dist_matrix, 0)
     dist_flat = dist_matrix |> Nx.to_list() |> Enum.concat() |> List.to_tuple()

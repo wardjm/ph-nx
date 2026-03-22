@@ -18,6 +18,16 @@ defmodule PhNx.Reduction do
 
   alias PhNx.{BoundaryMatrix, Filtration}
 
+  @typedoc "A raw index pair {birth_index, death_index} from the reduction."
+  @type index_pair :: {non_neg_integer(), non_neg_integer()}
+
+  @typedoc "Result of the reduction: raw index pairs, essential simplex indices, and the reduced matrix."
+  @type reduction_result :: %{
+          pairs: [index_pair()],
+          essential: [non_neg_integer()],
+          reduced: BoundaryMatrix.t()
+        }
+
   @doc """
   Pre-pass: identify apparent pairs from the boundary matrix and filtration.
 
@@ -32,6 +42,8 @@ defmodule PhNx.Reduction do
 
   Returns `{pairs, boundary}` where apparent pairs are pre-recorded.
   """
+  @spec apparent_pairs(BoundaryMatrix.t(), [Filtration.simplex()]) ::
+          {[index_pair()], BoundaryMatrix.t()}
   def apparent_pairs(boundary, filtration) do
     coface_map = build_coface_map(filtration)
 
@@ -81,6 +93,8 @@ defmodule PhNx.Reduction do
 
   where `i` and `j` are filtration indices.
   """
+  @spec reduce(BoundaryMatrix.t(), non_neg_integer(), [Filtration.simplex()] | nil) ::
+          reduction_result()
   def reduce(boundary, filtration_size, filtration \\ nil) do
     {ap_pairs, boundary} =
       if filtration, do: apparent_pairs(boundary, filtration), else: {[], boundary}

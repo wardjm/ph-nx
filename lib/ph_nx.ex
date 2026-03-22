@@ -24,8 +24,17 @@ defmodule PhNx do
     - `PhNx.Persistence`    — high-level API and output formatting
   """
 
+  @spec compute(Nx.Tensor.t() | [[number()]], keyword()) :: PhNx.Persistence.result()
   defdelegate compute(points, opts \\ []), to: PhNx.Persistence
+
+  @spec print_barcode(PhNx.Persistence.result()) :: :ok
   defdelegate print_barcode(result), to: PhNx.Persistence
+
+  @spec most_persistent(PhNx.Persistence.result(), pos_integer()) ::
+          [{non_neg_integer(), float(), float(), float()}]
   defdelegate most_persistent(result, n \\ 10), to: PhNx.Persistence
+
+  @spec betti_numbers(PhNx.Persistence.result()) ::
+          %{optional(non_neg_integer()) => non_neg_integer()}
   defdelegate betti_numbers(result), to: PhNx.Persistence
 end

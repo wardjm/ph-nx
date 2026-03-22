@@ -11,12 +11,16 @@ defmodule PhNx.BoundaryMatrix do
 
   alias PhNx.Filtration
 
+  @typedoc "Sparse boundary matrix over F₂: maps column index to the set of nonzero row indices."
+  @type t :: %{optional(non_neg_integer()) => MapSet.t(non_neg_integer())}
+
   @doc """
   Build the sparse boundary matrix from a filtration.
 
   Returns `{boundary_matrix, filtration}` where `boundary_matrix` is
   `%{non_neg_integer() => MapSet.t(non_neg_integer())}`.
   """
+  @spec build([Filtration.simplex()]) :: {t(), [Filtration.simplex()]}
   def build(filtration) do
     index_map = Filtration.index_map(filtration)
 
@@ -45,6 +49,7 @@ defmodule PhNx.BoundaryMatrix do
   @doc """
   Return the lowest (maximum) row index in column `col`, or `nil` if the column is zero.
   """
+  @spec lowest(t(), non_neg_integer()) :: non_neg_integer() | nil
   def lowest(boundary, col) do
     case Map.get(boundary, col) do
       nil -> nil
@@ -56,6 +61,7 @@ defmodule PhNx.BoundaryMatrix do
   Add column `src` to column `dst` over F₂ (symmetric difference of their row sets).
   Returns updated boundary matrix.
   """
+  @spec add_columns(t(), non_neg_integer(), non_neg_integer()) :: t()
   def add_columns(boundary, dst, src) do
     col_dst = Map.get(boundary, dst, MapSet.new())
     col_src = Map.get(boundary, src, MapSet.new())
@@ -72,6 +78,7 @@ defmodule PhNx.BoundaryMatrix do
   Convert the sparse boundary matrix to a dense Nx tensor for inspection/visualization.
   Returns an {m, m} tensor over u8.
   """
+  @spec to_tensor(t(), non_neg_integer()) :: Nx.Tensor.t()
   def to_tensor(boundary, m) do
     base = Nx.broadcast(Nx.tensor(0, type: :u8), {m, m})
 
