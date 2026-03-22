@@ -73,15 +73,19 @@ defmodule PhNx.BoundaryMatrix do
   Returns an {m, m} tensor over u8.
   """
   def to_tensor(boundary, m) do
-    rows = List.duplicate(List.duplicate(0, m), m)
+    base = Nx.broadcast(Nx.tensor(0, type: :u8), {m, m})
 
-    dense =
-      Enum.reduce(boundary, rows, fn {col, row_set}, acc ->
-        Enum.reduce(row_set, acc, fn row, a ->
-          List.update_at(a, row, fn r -> List.replace_at(r, col, 1) end)
-        end)
+    all_indices =
+      Enum.flat_map(boundary, fn {col, row_set} ->
+        Enum.map(row_set, fn row -> [row, col] end)
       end)
 
-    Nx.tensor(dense, type: :u8)
+    if all_indices == [] do
+      base
+    else
+      indices = Nx.tensor(all_indices)
+      updates = Nx.broadcast(Nx.tensor(1, type: :u8), {length(all_indices)})
+      Nx.indexed_put(base, indices, updates)
+    end
   end
 end
