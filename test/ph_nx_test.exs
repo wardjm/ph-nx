@@ -49,6 +49,22 @@ defmodule PhNxTest do
       dists = Enum.map(edges, fn {_, _, x} -> x end)
       assert dists == Enum.sort(dists)
     end
+
+    test "returns n*(n-1)/2 edges for n points" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+      d = Distance.euclidean(pts)
+      edges = Distance.sorted_edges(d)
+      assert length(edges) == 6
+    end
+
+    test "each edge {i, j, dist} has i < j and correct distance" do
+      pts = Nx.tensor([[0.0, 0.0], [3.0, 4.0]])
+      d = Distance.euclidean(pts)
+      [{i, j, dist}] = Distance.sorted_edges(d)
+      assert i == 0
+      assert j == 1
+      assert_in_delta dist, 5.0, 1.0e-9
+    end
   end
 
   # ── Filtration ───────────────────────────────────────────────────────────────
