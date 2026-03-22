@@ -2,7 +2,7 @@
 
 Persistent homology in Elixir using [Nx](https://github.com/elixir-nx/nx).
 
-Computes the persistent homology of a finite point cloud via the **Vietoris-Rips filtration** and the **standard persistence algorithm over F₂** (Edelsbrunner, Letscher, Zomorodian 2002). Results match [ripser](https://github.com/Ripser/ripser) exactly.
+Computes the persistent homology of a finite point cloud via the Vietoris-Rips filtration and the standard persistence algorithm over F₂. Results match [ripser](https://github.com/Ripser/ripser) exactly.
 
 ## Quick start
 
@@ -55,20 +55,12 @@ config :exla,
 ## API
 
 ```elixir
-# Compute persistent homology
 result = PhNx.compute(points, max_dim: 2)
 # => %{pairs: [{dim, birth, death}], essential: [{dim, birth}], diagram: [...]}
 
-# Print barcode
 PhNx.print_barcode(result)
-
-# Betti numbers (count of essential/infinite bars per dimension)
-PhNx.betti_numbers(result)
-# => %{0 => 1, 1 => 0}
-
-# Top features by persistence
-PhNx.most_persistent(result, 5)
-# => [{dim, birth, death, persistence}, ...]
+PhNx.betti_numbers(result)     # => %{0 => 1, 1 => 0}
+PhNx.most_persistent(result, 5) # => [{dim, birth, death, persistence}, ...]
 ```
 
 ### Options for `compute/2`
@@ -77,64 +69,6 @@ PhNx.most_persistent(result, 5)
 |---|---|---|
 | `:max_dim` | `2` | Maximum simplex dimension. To detect Hₖ features you need simplices up to dimension k+1. |
 | `:threshold` | `:infinity` | Ignore simplices born after this filtration value. |
-
-## How it works
-
-### Pipeline
-
-```
-Point cloud
-    │
-    ▼  PhNx.Distance
-Distance matrix (Nx tensor, Euclidean)
-    │
-    ▼  PhNx.Filtration
-Vietoris-Rips filtration
-  (simplices sorted by birth = max pairwise distance among vertices)
-    │
-    ▼  PhNx.BoundaryMatrix
-Sparse boundary matrix over F₂
-  (columns = simplices, rows = codimension-1 faces, stored as MapSets)
-    │
-    ▼  PhNx.Reduction
-Column reduction (standard persistence algorithm)
-  (pivot elimination via XOR / symmetric difference)
-    │
-    ▼  PhNx.Persistence
-Persistence pairs + essential classes
-  → barcode / persistence diagram
-```
-
-### Key concepts
-
-- **Vietoris-Rips filtration**: a simplex σ = {v₀, …, vₖ} is born at `max{ dist(vᵢ, vⱼ) }` — the diameter of its vertex set. Simplices are processed in birth order.
-- **Boundary matrix**: the m×m matrix ∂ over F₂ where ∂[i,j] = 1 if simplex i is a codimension-1 face of simplex j. Stored sparsely as `%{col → MapSet of rows}`.
-- **Column reduction**: reduce ∂ by left-to-right column additions (XOR). A pivot pair (i, j) means simplex i creates a homology class that simplex j destroys. Unpivoted simplices with zero columns are essential (infinite bars).
-- **Apparent pairs**: a pair (σ, τ) is apparent when σ is the highest-indexed face of τ and τ is the lowest-indexed cofacet of σ. Such pairs are resolved in O(1) before the main reduction loop — no column operations needed.
-- **Clearing lemma**: once a pair (σ, τ) is recorded, column σ is deleted from the boundary matrix — it will never be needed for further elimination.
-- **Persistence pair** (i, j): birth = filtration value of simplex i, death = filtration value of simplex j. The homology dimension is `dim(i)`.
-
-## Validation vs ripser
-
-Tested against [ripser](https://github.com/Ripser/ripser) on the SO(3) point cloud (`o3_1024.txt`, 50-point subset, 9-dimensional):
-
-- **49 H₀ pairs**: exact match ✓
-- **51 H₁ pairs**: exact match ✓
-
-```
-ripser --format point-cloud --dim 1 o3_50.txt
-```
-
-## Performance
-
-Benchmarked on 50 points × 9 dimensions, max_dim=2 (~20,875 simplices):
-
-| Backend | Distance matrix | Filtration | Boundary | Reduction | Total |
-|---|---|---|---|---|---|
-| EXLA (CPU) | 1ms | 30ms | 20ms | 554ms | ~620ms |
-| BinaryBackend | 19ms | 30ms | 22ms | 554ms | ~640ms |
-
-EXLA accelerates the distance matrix computation ~19× but the bottleneck is the pure-Elixir column reduction (~89% of runtime), which does not use Nx tensors and is unaffected by the backend choice.
 
 ## Modules
 
@@ -149,7 +83,5 @@ EXLA accelerates the distance matrix computation ~19× but the bottleneck is the
 
 ## Limitations & future work
 
-- **Scale**: reduction is O(m³) worst-case in the number of simplices m. For point clouds larger than ~100 points without a threshold, runtime grows quickly.
-- **Threshold**: pass `threshold: t` to `compute/2` to limit the filtration and keep runtimes manageable.
-- **Nx-accelerated filtration**: simplex birth-time computation is pure Elixir; moving it into Nx tensor ops could accelerate filtration construction.
+- **Scale**: reduction is O(m³) worst-case in the number of simplices. For point clouds larger than ~100 points without a threshold, runtime grows quickly. Pass `threshold: t` to `compute/2` to limit the filtration.
 - **Sparse distance input**: currently only Euclidean point clouds are supported; sparse or precomputed distance matrices could be added.
