@@ -100,8 +100,12 @@ defmodule PhNx.RipserComparisonTest do
   # hom_dim = max homology dimension (our max_dim = hom_dim + 1, the max *simplex* dim)
 
   @fixtures [
-    {"o3_30 H0+H1", "test/fixtures/o3_30.txt", "test/fixtures/o3_30_ripser_dim1.txt", 1},
-    {"o3_50 H0+H1", "test/fixtures/o3_50.txt", "test/fixtures/o3_50_ripser_dim1.txt", 1}
+    {"o3_20 H0+H1",  "test/fixtures/o3_20.txt",  "test/fixtures/o3_20_ripser_dim1.txt",  1},
+    {"o3_30 H0+H1",  "test/fixtures/o3_30.txt",  "test/fixtures/o3_30_ripser_dim1.txt",  1},
+    {"o3_30b H0+H1", "test/fixtures/o3_30b.txt", "test/fixtures/o3_30b_ripser_dim1.txt", 1},
+    {"o3_40 H0+H1",  "test/fixtures/o3_40.txt",  "test/fixtures/o3_40_ripser_dim1.txt",  1},
+    {"o3_50 H0+H1",  "test/fixtures/o3_50.txt",  "test/fixtures/o3_50_ripser_dim1.txt",  1},
+    {"o3_50b H0+H1", "test/fixtures/o3_50b.txt", "test/fixtures/o3_50b_ripser_dim1.txt", 1}
   ]
 
   for {label, points_file, ripser_file, hom_dim} <- @fixtures do
