@@ -36,6 +36,10 @@ defmodule PhNx.Persistence do
     opts = Keyword.validate!(opts, [:max_dim, :threshold])
     max_dim = Keyword.get(opts, :max_dim, 2)
 
+    if points == [] or (is_list(points) and length(points) == 0) do
+      raise ArgumentError, "point cloud must be non-empty"
+    end
+
     points = if is_list(points), do: Nx.tensor(points, type: :f64), else: points
 
     if Nx.axis_size(points, 0) == 0 do

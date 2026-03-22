@@ -380,6 +380,21 @@ defmodule PhNxTest do
       assert length(result.diagram) == expected_count
     end
 
+    test "empty list raises ArgumentError" do
+      assert_raise ArgumentError, "point cloud must be non-empty", fn ->
+        Persistence.compute([])
+      end
+    end
+
+    test "single-point list does not raise" do
+      assert %{pairs: _, essential: _, diagram: _} = Persistence.compute([[0.0, 0.0]])
+    end
+
+    test "single-point tensor does not raise" do
+      pts = Nx.tensor([[0.0, 0.0]])
+      assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts)
+    end
+
     test "unknown option key raises ArgumentError" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       assert_raise ArgumentError, fn -> Persistence.compute(pts, max_dims: 2) end
