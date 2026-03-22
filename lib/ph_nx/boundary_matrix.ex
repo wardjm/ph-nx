@@ -48,7 +48,6 @@ defmodule PhNx.BoundaryMatrix do
   def lowest(boundary, col) do
     case Map.get(boundary, col) do
       nil -> nil
-      set when map_size(%{}) == 0 -> if MapSet.size(set) == 0, do: nil, else: Enum.max(set)
       set -> if MapSet.size(set) == 0, do: nil, else: Enum.max(set)
     end
   end

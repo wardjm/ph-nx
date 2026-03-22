@@ -170,6 +170,10 @@ defmodule PhNxTest do
     test "returns nil for missing column" do
       assert BoundaryMatrix.lowest(%{}, 0) == nil
     end
+
+    test "returns nil for empty column set" do
+      assert BoundaryMatrix.lowest(%{0 => MapSet.new()}, 0) == nil
+    end
   end
 
   describe "BoundaryMatrix.add_columns/3" do
