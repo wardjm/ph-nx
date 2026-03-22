@@ -92,8 +92,7 @@ defmodule PhNx.Persistence do
       |> Enum.sort()
 
     diagram =
-      (Enum.map(pairs, fn {d, b, death} -> {d, b, death} end) ++
-         Enum.map(essential, fn {d, b} -> {d, b, :infinity} end))
+      (pairs ++ Enum.map(essential, fn {d, b} -> {d, b, :infinity} end))
       |> Enum.sort()
 
     %{pairs: pairs, essential: essential, diagram: diagram}
