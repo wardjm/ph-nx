@@ -86,6 +86,25 @@ defmodule PhNxTest do
       vertices = Enum.filter(f, &(&1.dim == 0))
       assert Enum.all?(vertices, &(&1.birth == 0.0))
     end
+
+    test "edge birth is the distance between its endpoints" do
+      pts = Nx.tensor([[0.0, 0.0], [3.0, 4.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      idx = Map.new(f, fn s -> {s.vertices, s.birth} end)
+      assert_in_delta idx[[0, 1]], 5.0, 1.0e-9
+      assert_in_delta idx[[0, 2]], 1.0, 1.0e-9
+      assert_in_delta idx[[1, 2]], :math.sqrt(9 + 9), 1.0e-9
+    end
+
+    test "triangle birth is the max edge length (diameter of vertex set)" do
+      # Right triangle: legs 1.0 and 1.0, hypotenuse sqrt(2)
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      tri = Enum.find(f, &(&1.vertices == [0, 1, 2]))
+      assert_in_delta tri.birth, :math.sqrt(2), 1.0e-9
+    end
   end
 
   describe "Filtration.faces/1" do
