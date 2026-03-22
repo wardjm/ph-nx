@@ -379,6 +379,23 @@ defmodule PhNxTest do
       expected_count = length(result.pairs) + length(result.essential)
       assert length(result.diagram) == expected_count
     end
+
+    test "unknown option key raises ArgumentError" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      assert_raise ArgumentError, fn -> Persistence.compute(pts, max_dims: 2) end
+    end
+
+    test "multiple unknown option keys raise ArgumentError" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      assert_raise ArgumentError, fn -> Persistence.compute(pts, foo: 1, bar: 2) end
+    end
+
+    test "valid options do not raise" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts, max_dim: 1)
+      assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts, threshold: 2.0)
+      assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts, max_dim: 1, threshold: 2.0)
+    end
   end
 
   describe "Persistence.most_persistent/2" do

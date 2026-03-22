@@ -33,6 +33,7 @@ defmodule PhNx.Persistence do
     }
   """
   def compute(points, opts \\ []) do
+    opts = Keyword.validate!(opts, [:max_dim, :threshold])
     max_dim = Keyword.get(opts, :max_dim, 2)
 
     points = if is_list(points), do: Nx.tensor(points, type: :f64), else: points

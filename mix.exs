@@ -22,7 +22,7 @@ defmodule PhNx.MixProject do
   defp deps do
     [
       {:nx, "~> 0.9"},
-      {:exla, "~> 0.11.0"}
+      {:exla, "~> 0.11.0", runtime: Mix.env() != :test}
     ]
   end
 end
