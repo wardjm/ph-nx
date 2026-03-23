@@ -37,14 +37,9 @@ defmodule PhNx.Filtration do
     n = Nx.axis_size(dist_matrix, 0)
 
     # Extract the distance matrix into a flat tuple for O(1) pair lookups.
-    # dist_flat[i*n + j] == dist(i, j). Nx.to_list handles EXLA device-to-host
-    # transfer. The Enum.concat + List.to_tuple setup is O(n²) but runs once;
+    # dist_flat[i*n + j] == dist(i, j). The setup is O(n²) but runs once;
     # each per-simplex birth lookup is then O(1) via elem/2 with no allocation.
-    dist_flat =
-      dist_matrix
-      |> Nx.to_list()
-      |> Enum.concat()
-      |> List.to_tuple()
+    dist_flat = PhNx.Distance.flat_tuple(dist_matrix)
 
     vertices = for i <- 0..(n - 1), do: [i]
 
