@@ -51,6 +51,17 @@ defmodule PhNx.Distance do
   end
 
   @doc """
+  Flatten a distance matrix Nx tensor into a tuple for O(1) pair lookups.
+
+  `dist_flat[i*n + j]` gives `dist(i, j)` via `elem/2`.
+  Handles EXLA device-to-host transfer via `Nx.to_list/1`.
+  """
+  @spec flat_tuple(Nx.Tensor.t()) :: tuple()
+  def flat_tuple(dist_matrix) do
+    dist_matrix |> Nx.to_list() |> Enum.concat() |> List.to_tuple()
+  end
+
+  @doc """
   Extract the upper-triangular entries of a distance matrix as `{i, j, dist}` triples,
   sorted by distance ascending.
 
@@ -63,7 +74,7 @@ defmodule PhNx.Distance do
   @spec sorted_edges(Nx.Tensor.t()) :: [{non_neg_integer(), non_neg_integer(), float()}]
   def sorted_edges(dist_matrix) do
     n = Nx.axis_size(dist_matrix, 0)
-    dist_flat = dist_matrix |> Nx.to_list() |> Enum.concat() |> List.to_tuple()
+    dist_flat = flat_tuple(dist_matrix)
 
     for i <- 0..(n - 2),
         j <- (i + 1)..(n - 1) do
