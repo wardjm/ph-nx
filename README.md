@@ -83,5 +83,5 @@ PhNx.most_persistent(result, 5) # => [{dim, birth, death, persistence}, ...]
 
 ## Limitations & future work
 
-- **Scale**: reduction is O(m³) worst-case in the number of simplices. The default threshold (enclosing radius) limits the filtration automatically, but passing `threshold: :infinity` on large point clouds will grow quickly.
+- **Scale**: reduction is O(m³) worst-case in the number of simplices. The default threshold (enclosing radius) limits the filtration automatically, but passing `threshold: :infinity` on large point clouds will grow quickly. See [docs/performance.md](docs/performance.md) for complexity details, benchmark numbers, and guidance on controlling simplex count.
 - **Sparse distance input**: currently only Euclidean point clouds are supported; sparse or precomputed distance matrices could be added.
