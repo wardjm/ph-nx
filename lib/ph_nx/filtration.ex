@@ -16,6 +16,21 @@ defmodule PhNx.Filtration do
 
   Distance lookups use a flat tuple extracted from the Nx distance matrix, giving
   O(1) access per pair via `elem/2` instead of O(n) nested `Enum.at` traversals.
+
+  ## Example
+
+      points = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      dist = PhNx.Distance.euclidean(points)
+      filtration = PhNx.Filtration.build(dist, 2)
+      # => [
+      #   %{vertices: [0], dim: 0, birth: 0.0, index: 0},
+      #   %{vertices: [1], dim: 0, birth: 0.0, index: 1},
+      #   %{vertices: [2], dim: 0, birth: 0.0, index: 2},
+      #   %{vertices: [0, 1], dim: 1, birth: 1.0, index: 3},
+      #   %{vertices: [0, 2], dim: 1, birth: 1.0, index: 4},
+      #   %{vertices: [1, 2], dim: 1, birth: 1.414..., index: 5},
+      #   %{vertices: [0, 1, 2], dim: 2, birth: 1.414..., index: 6}
+      # ]
   """
 
   @typedoc "A simplex in the filtration, with its vertex set, dimension, birth time, and index."

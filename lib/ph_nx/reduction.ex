@@ -14,6 +14,22 @@ defmodule PhNx.Reduction do
 
   Simplices that are never the pivot of any column are "essential": they create
   homology classes that persist to infinity.
+
+  ## Reference
+
+  Edelsbrunner, H., Letscher, D., & Zomorodian, A. (2002).
+  Topological persistence and simplification.
+  *Discrete & Computational Geometry*, 28(4), 511–533.
+
+  ## Example
+
+      points = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      dist = PhNx.Distance.euclidean(points)
+      filtration = PhNx.Filtration.build(dist, 2)
+      {boundary, _} = PhNx.BoundaryMatrix.build(filtration)
+      %{pairs: pairs, essential: essential} = PhNx.Reduction.reduce(boundary, length(filtration), filtration)
+      # pairs:    [{1, 3}, {2, 4}, {5, 6}]  — birth/death index pairs
+      # essential: [0]                       — vertex 0 generates the lone H0 class
   """
 
   alias PhNx.{BoundaryMatrix, Filtration}

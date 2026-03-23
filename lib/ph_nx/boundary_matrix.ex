@@ -7,6 +7,16 @@ defmodule PhNx.BoundaryMatrix do
 
   We represent it sparsely as a map `%{col_index => MapSet of row_indices}`.
   Only nonzero columns are stored. Zero columns are absent from the map.
+
+  ## Example
+
+      points = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      dist = PhNx.Distance.euclidean(points)
+      filtration = PhNx.Filtration.build(dist, 1)
+      {boundary, _} = PhNx.BoundaryMatrix.build(filtration)
+      # Vertices have no boundary (empty columns omitted).
+      # Each edge column holds the indices of its two endpoint vertices:
+      # %{3 => MapSet([0, 1]), 4 => MapSet([0, 2]), 5 => MapSet([1, 2])}
   """
 
   alias PhNx.Filtration
