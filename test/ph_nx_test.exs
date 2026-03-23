@@ -486,6 +486,35 @@ defmodule PhNxTest do
       assert %{pairs: _, essential: _, diagram: _} =
                Persistence.compute(pts, max_dim: 1, threshold: 2.0)
     end
+
+    test "identical points: zero-persistence pair is filtered, 1 essential H0 remains" do
+      # The edge [0,1] has birth = 0.0 (distance is 0), pairing with vertex 1
+      # at death = 0.0. Since birth == death the pair has zero persistence and
+      # is filtered out by compute/2, leaving only one essential H0 class.
+      pts = Nx.tensor([[0.0, 0.0], [0.0, 0.0]])
+      result = Persistence.compute(pts, max_dim: 1)
+      h0_essential = Enum.filter(result.essential, fn {d, _} -> d == 0 end)
+      h0_pairs = Enum.filter(result.pairs, fn {d, _, _} -> d == 0 end)
+      assert length(h0_essential) == 1
+      assert h0_pairs == []
+    end
+
+    test "single-dimensional point cloud has 1 essential H0 and no H1 features" do
+      # Three collinear points form a path graph — no loops possible.
+      pts = Nx.tensor([[0.0], [1.0], [2.0]])
+      result = Persistence.compute(pts, max_dim: 1)
+      h0_essential = Enum.filter(result.essential, fn {d, _} -> d == 0 end)
+      h1_pairs = Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)
+      assert length(h0_essential) == 1
+      assert h1_pairs == []
+    end
+
+    test "large max_dim does not crash" do
+      # 8 collinear points with max_dim=5 exercises high-dimensional simplex
+      # generation without producing any H1+ topology.
+      pts = Nx.tensor(for i <- 1..8, do: [i * 1.0, 0.0])
+      assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts, max_dim: 5)
+    end
   end
 
   describe "Persistence.most_persistent/2" do
