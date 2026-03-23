@@ -447,6 +447,7 @@ defmodule PhNxTest do
 
     test "negative max_dim raises ArgumentError" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+
       assert_raise ArgumentError, ~r/max_dim must be a non-negative integer/, fn ->
         Persistence.compute(pts, max_dim: -1)
       end
@@ -454,6 +455,7 @@ defmodule PhNxTest do
 
     test "float max_dim raises ArgumentError" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+
       assert_raise ArgumentError, ~r/max_dim must be a non-negative integer/, fn ->
         Persistence.compute(pts, max_dim: 1.5)
       end
@@ -480,7 +482,9 @@ defmodule PhNxTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts, max_dim: 1)
       assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts, threshold: 2.0)
-      assert %{pairs: _, essential: _, diagram: _} = Persistence.compute(pts, max_dim: 1, threshold: 2.0)
+
+      assert %{pairs: _, essential: _, diagram: _} =
+               Persistence.compute(pts, max_dim: 1, threshold: 2.0)
     end
   end
 

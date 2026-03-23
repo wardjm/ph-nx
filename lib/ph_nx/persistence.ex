@@ -154,7 +154,9 @@ defmodule PhNx.Persistence do
   Return persistence pairs sorted by persistence (death - birth) descending.
   Useful for identifying the most significant topological features.
   """
-  @spec most_persistent(result(), pos_integer()) :: [{non_neg_integer(), float(), float(), float()}]
+  @spec most_persistent(result(), pos_integer()) :: [
+          {non_neg_integer(), float(), float(), float()}
+        ]
   def most_persistent(%{pairs: pairs}, n \\ 10) do
     pairs
     |> Enum.map(fn {dim, birth, death} -> {dim, birth, death, death - birth} end)
