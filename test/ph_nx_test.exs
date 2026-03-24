@@ -353,6 +353,14 @@ defmodule PhNxTest do
   # ── BoundaryMatrix.reduce/1 and result/1 ─────────────────────────────────────
 
   describe "BoundaryMatrix.reduce/1 (t())" do
+    test "empty filtration: result/1 returns {[], []}" do
+      {pairs, essential} =
+        BoundaryMatrix.from_filtration([]) |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+
+      assert pairs == []
+      assert essential == []
+    end
+
     test "two-point filtration: pairs and essential via result/1" do
       # Filtration: v0(0), v1(1), e01(2). Pair: {1,2}. Essential: [0].
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
