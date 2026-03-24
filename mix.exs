@@ -11,7 +11,7 @@ defmodule PhNx.MixProject do
       homepage_url: "https://github.com/wardjm/ph-nx",
       docs: [
         main: "readme",
-        extras: ["README.md"]
+        extras: ["README.md", "docs/performance.md"]
       ],
       package: [
         licenses: ["MIT"],
