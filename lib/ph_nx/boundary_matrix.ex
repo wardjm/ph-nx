@@ -114,7 +114,7 @@ defmodule PhNx.BoundaryMatrix do
   @spec reduce(t()) :: t()
   @spec reduce([Filtration.simplex()]) :: t()
   def reduce(%__MODULE__{size: size} = bm) do
-    Enum.reduce(0..(size - 1), bm, fn col, acc ->
+    Enum.reduce(0..(size - 1)//1, bm, fn col, acc ->
       {_result, acc} = reduce_column(acc, col)
       acc
     end)
@@ -149,7 +149,7 @@ defmodule PhNx.BoundaryMatrix do
     pivot_rows = MapSet.new(Map.keys(bm.pivot_col))
 
     essential =
-      Enum.filter(0..(size - 1), fn i ->
+      Enum.filter(0..(size - 1)//1, fn i ->
         not Map.has_key?(bm.columns, i) and
           not MapSet.member?(pivot_rows, i) and
           not MapSet.member?(bm.paired_as_birth, i) and
