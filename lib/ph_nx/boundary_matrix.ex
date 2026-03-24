@@ -30,6 +30,8 @@ defmodule PhNx.BoundaryMatrix do
             ap_deaths: MapSet.t(non_neg_integer())
           }
 
+  @type column_result :: :already_resolved | :zero | :paired
+
   defstruct columns: %{},
             size: 0,
             pivot_col: %{},
@@ -155,8 +157,6 @@ defmodule PhNx.BoundaryMatrix do
 
     {bm.pairs, essential}
   end
-
-  @type column_result :: :already_resolved | :zero | :paired
 
   @doc """
   Perform one step of the standard column reduction algorithm on column `col`.
