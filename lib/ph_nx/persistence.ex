@@ -26,6 +26,9 @@ defmodule PhNx.Persistence do
   @typedoc "A diagram entry: finite pair or essential class extended to :infinity."
   @type diagram_entry :: {non_neg_integer(), float(), float() | :infinity}
 
+  @typedoc "A most-persistent feature: {dimension, birth, death, persistence} where persistence = death - birth."
+  @type persistent_feature :: {non_neg_integer(), float(), float(), float()}
+
   @typedoc "The result map returned by `compute/2`."
   @type result :: %{
           pairs: [pair()],
@@ -154,9 +157,7 @@ defmodule PhNx.Persistence do
   Return persistence pairs sorted by persistence (death - birth) descending.
   Useful for identifying the most significant topological features.
   """
-  @spec most_persistent(result(), pos_integer()) :: [
-          {non_neg_integer(), float(), float(), float()}
-        ]
+  @spec most_persistent(result(), pos_integer()) :: [persistent_feature()]
   def most_persistent(%{pairs: pairs}, n \\ 10) do
     pairs
     |> Enum.map(fn {dim, birth, death} -> {dim, birth, death, death - birth} end)
