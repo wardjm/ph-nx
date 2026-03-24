@@ -101,6 +101,59 @@ defmodule PhNx.BoundaryMatrix do
     end
   end
 
+  @type column_result :: :already_resolved | :zero | :paired
+
+  @doc """
+  Perform one step of the standard column reduction algorithm on column `col`.
+
+  Returns `{result, updated_matrix}` where `result` is one of:
+    * `:already_resolved` — the column was pre-resolved by an apparent pair
+    * `:zero` — the column is (or reduces to) zero; no pair recorded
+    * `:paired` — the column reduced to a nonzero pivot; a pair was recorded
+  """
+  @spec reduce_column(t(), non_neg_integer()) :: {column_result(), t()}
+  def reduce_column(%__MODULE__{ap_resolved: ap_resolved} = bm, col) do
+    if MapSet.member?(ap_resolved, col) do
+      {:already_resolved, bm}
+    else
+      do_reduce_column(bm, col)
+    end
+  end
+
+  defp do_reduce_column(%__MODULE__{columns: cols} = bm, col) do
+    case col_lowest(cols, col) do
+      nil ->
+        {:zero, bm}
+
+      low ->
+        case Map.get(bm.pivot_col, low) do
+          nil ->
+            # No existing pivot — record the pair
+            protected = MapSet.member?(bm.ap_deaths, low)
+
+            new_cols =
+              if protected,
+                do: bm.columns,
+                else: Map.delete(bm.columns, low)
+
+            new_bm = %{
+              bm
+              | columns: new_cols,
+                pivot_col: Map.put(bm.pivot_col, low, col),
+                pairs: [{low, col} | bm.pairs],
+                paired_as_birth: MapSet.put(bm.paired_as_birth, low)
+            }
+
+            {:paired, new_bm}
+
+          pivot_col ->
+            # XOR with the existing pivot column and retry
+            new_cols = xor_columns(bm.columns, col, pivot_col)
+            do_reduce_column(%{bm | columns: new_cols}, col)
+        end
+    end
+  end
+
   # ── Private helpers ────────────────────────────────────────────────────────
 
   defp build_columns(filtration, index_map) do
@@ -151,5 +204,15 @@ defmodule PhNx.BoundaryMatrix do
       nil -> nil
       set -> if MapSet.size(set) == 0, do: nil, else: Enum.max(set)
     end
+  end
+
+  defp xor_columns(columns, dst, src) do
+    col_dst = Map.get(columns, dst, MapSet.new())
+    col_src = Map.get(columns, src, MapSet.new())
+    result = MapSet.symmetric_difference(col_dst, col_src)
+
+    if MapSet.size(result) == 0,
+      do: Map.delete(columns, dst),
+      else: Map.put(columns, dst, result)
   end
 end

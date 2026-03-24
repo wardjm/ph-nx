@@ -290,6 +290,66 @@ defmodule PhNxTest do
     end
   end
 
+  # ── BoundaryMatrix.reduce_column/2 ───────────────────────────────────────────
+
+  describe "BoundaryMatrix.reduce_column/2" do
+    # Two-point filtration: [0] idx 0, [1] idx 1, [0,1] idx 2
+    # Bare matrix (no apparent pairs).
+    defp two_point_bare do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      BoundaryMatrix.from_filtration(f, seed_apparent: false)
+    end
+
+    test ":zero — vertex column (no boundary) returns {:zero, matrix}" do
+      bm = two_point_bare()
+      assert {:zero, _} = BoundaryMatrix.reduce_column(bm, 0)
+    end
+
+    test ":already_resolved — column pre-seeded by apparent pair returns {:already_resolved, matrix}" do
+      # Two-point filtration with apparent pairs seeded: edge [0,1] (idx 2)
+      # forms an apparent pair with vertex [1] (idx 1). So col 2 is in ap_resolved.
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm = BoundaryMatrix.from_filtration(f)
+      assert {:already_resolved, _} = BoundaryMatrix.reduce_column(bm, 2)
+    end
+
+    test ":paired — edge column with unique lowest row returns {:paired, matrix}" do
+      # Bare two-point filtration: v0 idx 0, v1 idx 1, e01 idx 2.
+      # Column 2 has boundary {0,1}, lowest=1. No existing pivot at row 1 → paired.
+      bm = two_point_bare()
+      assert {:paired, _} = BoundaryMatrix.reduce_column(bm, 2)
+    end
+
+    test "clearing — birth column is zeroed out after pairing" do
+      # After reducing col 2, its lowest row (1) becomes the pivot.
+      # Clearing lemma: col 1 (the birth) must be deleted → lowest(bm2, 1) == nil.
+      bm = two_point_bare()
+      {:paired, bm2} = BoundaryMatrix.reduce_column(bm, 2)
+      assert BoundaryMatrix.lowest(bm2, 1) == nil
+    end
+
+    test ":paired after XOR — column requiring prior XOR still pairs correctly" do
+      # 4-point square (dim=2), seeded apparent pairs.
+      # v0-v3 idx 0-3, edges idx 4-9, triangles idx 10-13.
+      # Apparent pairs: {1,4},{2,5},{3,6},{9,10},{8,11} → ap_resolved includes 10,11.
+      # Column 12 (t023, boundary={5,7,8}):
+      #   lowest=8, pivot_col[8]=11 → XOR with col11 first, then finds lowest=7 (no pivot) → paired.
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      bm = BoundaryMatrix.from_filtration(f)
+      tri023 = Enum.find(f, &(&1.vertices == [0, 2, 3]))
+      assert {:paired, bm2} = BoundaryMatrix.reduce_column(bm, tri023.index)
+      # The birth edge (e23, the one cleared) should now have lowest=nil.
+      e23 = Enum.find(f, &(&1.vertices == [2, 3]))
+      assert BoundaryMatrix.lowest(bm2, e23.index) == nil
+    end
+  end
+
   # ── Reduction ────────────────────────────────────────────────────────────────
 
   describe "Reduction.reduce/1 (with apparent pairs pre-seeded)" do
