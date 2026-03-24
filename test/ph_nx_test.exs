@@ -178,6 +178,20 @@ defmodule PhNxTest do
       end)
     end
 
+    test "triangle columns each have exactly 3 non-zero rows" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      bm = BoundaryMatrix.from_filtration(f)
+      m = length(f)
+      t = BoundaryMatrix.to_tensor(bm, m)
+
+      Enum.each(Enum.filter(f, &(&1.dim == 2)), fn %{index: j} ->
+        col = t[[.., j]] |> Nx.to_list()
+        assert Enum.sum(col) == 3
+      end)
+    end
+
     test "seed_apparent: false produces same tensor as default (columns unchanged)" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
@@ -206,6 +220,22 @@ defmodule PhNxTest do
       f = Filtration.build(d, 1)
       bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
       assert BoundaryMatrix.lowest(bm, 0) == nil
+    end
+
+    test "returns max face index for a triangle column (3 boundary rows)" do
+      # Right triangle: vertices 0,1,2 at indices 0-2; edges at 3-5; triangle at 6.
+      # Triangle boundary = {3, 4, 5}; lowest = max = 5.
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      tri = Enum.find(f, &(&1.dim == 2))
+
+      edge_indices =
+        Filtration.faces(tri)
+        |> Enum.map(fn verts -> Enum.find(f, &(&1.vertices == verts)).index end)
+
+      assert BoundaryMatrix.lowest(bm, tri.index) == Enum.max(edge_indices)
     end
 
     test "returns nil for a column absent from the matrix" do
@@ -241,7 +271,7 @@ defmodule PhNxTest do
       assert Enum.at(Enum.at(mat, 2), 2) == 0
     end
 
-    test "matches expected shape for real filtration" do
+    test "dim=1 filtration: each edge column has exactly 2 ones, vertex columns are zero" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
@@ -249,6 +279,14 @@ defmodule PhNxTest do
       m = length(f)
       t = BoundaryMatrix.to_tensor(bm, m)
       assert Nx.shape(t) == {m, m}
+
+      Enum.each(f, fn %{index: j, dim: dim} ->
+        col_sum = t[[.., j]] |> Nx.to_list() |> Enum.sum()
+        expected = if dim == 0, do: 0, else: 2
+
+        assert col_sum == expected,
+               "column #{j} (dim #{dim}) expected #{expected} ones, got #{col_sum}"
+      end)
     end
   end
 
