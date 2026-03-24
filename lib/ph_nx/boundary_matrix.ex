@@ -27,8 +27,7 @@ defmodule PhNx.BoundaryMatrix do
             pivot_col: %{optional(non_neg_integer()) => non_neg_integer()},
             pairs: [{non_neg_integer(), non_neg_integer()}],
             ap_resolved: MapSet.t(non_neg_integer()),
-            ap_deaths: MapSet.t(non_neg_integer()),
-            paired_as_birth: MapSet.t(non_neg_integer())
+            ap_deaths: MapSet.t(non_neg_integer())
           }
 
   defstruct columns: %{},
@@ -36,8 +35,7 @@ defmodule PhNx.BoundaryMatrix do
             pivot_col: %{},
             pairs: [],
             ap_resolved: MapSet.new(),
-            ap_deaths: MapSet.new(),
-            paired_as_birth: MapSet.new()
+            ap_deaths: MapSet.new()
 
   @doc """
   Build a BoundaryMatrix from a filtration.
@@ -140,19 +138,18 @@ defmodule PhNx.BoundaryMatrix do
   """
   @spec result(t()) :: {[{non_neg_integer(), non_neg_integer()}], [non_neg_integer()]}
   def result(%__MODULE__{size: size} = bm) do
-    # pivot_col keys are the birth indices of all pairs (both apparent and reduction-found).
-    # paired_as_birth is maintained incrementally by reduce_column/2 and covers the same
-    # set; both conditions are kept for correctness.
-    # Note: apparent-pair birth columns may still appear in bm.columns (they are protected
-    # from erasure when they are also an ap_death), so the first condition alone would
-    # incorrectly include them — the paired_as_birth/ap_resolved conditions exclude them.
+    # Invariant: keys(pivot_col) = apparent-pair births ∪ reduction-found births.
+    # Apparent pairs seed pivot_col in from_filtration/2; reduction pairs add to pivot_col
+    # in do_reduce_column/2. Both paths land in pivot_col, so a single membership check
+    # here covers all paired births.
+    # ap_resolved additionally excludes apparent-pair death columns, which can remain in
+    # bm.columns when the death index is also a birth in another pair.
     pivot_rows = MapSet.new(Map.keys(bm.pivot_col))
 
     essential =
       Enum.filter(0..(size - 1)//1, fn i ->
         not Map.has_key?(bm.columns, i) and
           not MapSet.member?(pivot_rows, i) and
-          not MapSet.member?(bm.paired_as_birth, i) and
           not MapSet.member?(bm.ap_resolved, i)
       end)
 
@@ -198,8 +195,7 @@ defmodule PhNx.BoundaryMatrix do
               bm
               | columns: new_cols,
                 pivot_col: Map.put(bm.pivot_col, low, col),
-                pairs: [{low, col} | bm.pairs],
-                paired_as_birth: MapSet.put(bm.paired_as_birth, low)
+                pairs: [{low, col} | bm.pairs]
             }
 
             {:paired, new_bm}
