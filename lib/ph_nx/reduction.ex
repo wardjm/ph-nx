@@ -70,8 +70,7 @@ defmodule PhNx.Reduction do
     } = bm
 
     {reduced_cols, pivot_col, pairs} =
-      Enum.reduce(0..(size - 1), {columns, ap_pivot_col, ap_pairs}, fn j,
-                                                                       {cols, pc, ps} ->
+      Enum.reduce(0..(size - 1), {columns, ap_pivot_col, ap_pairs}, fn j, {cols, pc, ps} ->
         if MapSet.member?(ap_resolved, j) do
           {cols, pc, ps}
         else
