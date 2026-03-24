@@ -15,7 +15,7 @@ defmodule PhNx.Persistence do
       PhNx.Persistence.print_barcode(result)
   """
 
-  alias PhNx.{Distance, Filtration, BoundaryMatrix, Reduction}
+  alias PhNx.{Distance, Filtration, BoundaryMatrix}
 
   @typedoc "A finite persistence pair: {dimension, birth, death}."
   @type pair :: {non_neg_integer(), float(), float()}
@@ -83,9 +83,10 @@ defmodule PhNx.Persistence do
       |> Filtration.build(max_dim)
       |> maybe_threshold(threshold)
 
-    bm = BoundaryMatrix.from_filtration(filtration)
-
-    %{pairs: raw_pairs, essential: raw_essential} = Reduction.reduce(bm)
+    {raw_pairs, raw_essential} =
+      filtration
+      |> BoundaryMatrix.reduce()
+      |> BoundaryMatrix.result()
 
     # Map filtration indices back to (dim, birth) info
     idx_to_simplex = Map.new(filtration, fn s -> {s.index, s} end)
