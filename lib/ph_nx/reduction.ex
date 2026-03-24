@@ -15,6 +15,9 @@ defmodule PhNx.Reduction do
   Simplices that are never the pivot of any column are "essential": they create
   homology classes that persist to infinity.
 
+  Apparent pairs pre-seeded in the `BoundaryMatrix` (via `BoundaryMatrix.from_filtration/2`)
+  are used to skip columns that are already resolved, accelerating the reduction.
+
   ## Reference
 
   Edelsbrunner, H., Letscher, D., & Zomorodian, A. (2002).
@@ -26,13 +29,13 @@ defmodule PhNx.Reduction do
       points = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       dist = PhNx.Distance.euclidean(points)
       filtration = PhNx.Filtration.build(dist, 2)
-      {boundary, _} = PhNx.BoundaryMatrix.build(filtration)
-      %{pairs: pairs, essential: essential} = PhNx.Reduction.reduce(boundary, length(filtration), filtration)
+      bm = PhNx.BoundaryMatrix.from_filtration(filtration)
+      %{pairs: pairs, essential: essential} = PhNx.Reduction.reduce(bm)
       # pairs:    [{1, 3}, {2, 4}, {5, 6}]  — birth/death index pairs
       # essential: [0]                       — vertex 0 generates the lone H0 class
   """
 
-  alias PhNx.{BoundaryMatrix, Filtration}
+  alias PhNx.BoundaryMatrix
 
   @typedoc "A raw index pair {birth_index, death_index} from the reduction."
   @type index_pair :: {non_neg_integer(), non_neg_integer()}
@@ -45,134 +48,87 @@ defmodule PhNx.Reduction do
         }
 
   @doc """
-  Pre-pass: identify apparent pairs from the boundary matrix and filtration.
-
-  A pair (σ, τ) is apparent when:
-    1. σ = lowest(column(τ))  — σ is the highest-indexed face of τ
-    2. τ = min(cofaces of σ)  — τ is the lowest-indexed coface of σ
-
-  Condition 2 uses the MINIMUM coface index. For the forward boundary reduction
-  algorithm (columns processed left-to-right), τ = min cofacet of σ guarantees
-  no earlier column can have claimed σ as a pivot, so the pair requires zero
-  column operations to detect.
-
-  Returns `{pairs, boundary}` where apparent pairs are pre-recorded.
-  """
-  @spec apparent_pairs(BoundaryMatrix.t(), [Filtration.simplex()]) ::
-          {[index_pair()], BoundaryMatrix.t()}
-  def apparent_pairs(boundary, filtration) do
-    coface_map = build_coface_map(filtration)
-
-    {pairs, boundary} =
-      filtration
-      |> Enum.reduce({[], boundary}, fn %{index: j}, {pairs, bnd} ->
-        with low when not is_nil(low) <- BoundaryMatrix.lowest(bnd, j),
-             cofaces when cofaces != [] <- Map.get(coface_map, low, []),
-             ^j <- Enum.min(cofaces) do
-          # Do NOT delete any columns: a simplex can simultaneously be the death
-          # of one ap pair (H0) and the birth of another (H1). Its column must
-          # remain in the boundary so other columns can eliminate against it.
-          # The skip set (ap_resolved) prevents re-processing; the ap_deaths
-          # protection set prevents the clearing lemma from deleting it.
-          {[{low, j} | pairs], bnd}
-        else
-          _ -> {pairs, bnd}
-        end
-      end)
-
-    {pairs, boundary}
-  end
-
-  defp build_coface_map(filtration) do
-    vertex_to_idx = Filtration.index_map(filtration)
-
-    Enum.reduce(filtration, %{}, fn simplex, acc ->
-      simplex
-      |> Filtration.faces()
-      |> Enum.reduce(acc, fn face_verts, a ->
-        case Map.get(vertex_to_idx, face_verts) do
-          nil ->
-            a
-
-          face_idx ->
-            Map.update(a, face_idx, [simplex.index], &[simplex.index | &1])
-        end
-      end)
-    end)
-  end
-
-  @doc """
   Reduce the boundary matrix and return persistence pairs and essential simplices.
 
+  The `BoundaryMatrix` must be constructed via `BoundaryMatrix.from_filtration/2`.
+  Apparent pairs pre-seeded in the matrix are respected — those columns are skipped.
+
   Returns:
-    `%{pairs: [{i, j}], essential: [i], reduced: boundary_map}`
+    `%{pairs: [{i, j}], essential: [i], reduced: %BoundaryMatrix{}}`
 
   where `i` and `j` are filtration indices.
   """
-  @spec reduce(BoundaryMatrix.t(), non_neg_integer(), [Filtration.simplex()] | nil) ::
-          reduction_result()
-  def reduce(boundary, filtration_size, filtration \\ nil) do
-    {ap_pairs, boundary} =
-      if filtration, do: apparent_pairs(boundary, filtration), else: {[], boundary}
+  @spec reduce(BoundaryMatrix.t()) :: reduction_result()
+  def reduce(%BoundaryMatrix{} = bm) do
+    %BoundaryMatrix{
+      columns: columns,
+      size: size,
+      pivot_col: ap_pivot_col,
+      pairs: ap_pairs,
+      ap_resolved: ap_resolved,
+      ap_deaths: ap_deaths
+    } = bm
 
-    # Seed pivot_col with apparent pairs so the main loop can eliminate against them.
-    # Track births+deaths to skip, and death columns to protect from clearing.
-    {ap_pivot_col, ap_resolved, ap_deaths} =
-      Enum.reduce(ap_pairs, {%{}, MapSet.new(), MapSet.new()}, fn {low, j}, {pc, res, deaths} ->
-        {Map.put(pc, low, j), res |> MapSet.put(low) |> MapSet.put(j), MapSet.put(deaths, j)}
-      end)
-
-    # pivot_col: maps a row index (pivot) to the column index that owns it
-    {reduced, pivot_col, pairs} =
-      Enum.reduce(0..(filtration_size - 1), {boundary, ap_pivot_col, ap_pairs}, fn j,
-                                                                                   {bnd,
-                                                                                    pivot_col,
-                                                                                    pairs} ->
+    {reduced_cols, pivot_col, pairs} =
+      Enum.reduce(0..(size - 1), {columns, ap_pivot_col, ap_pairs}, fn j, {cols, pc, ps} ->
         if MapSet.member?(ap_resolved, j) do
-          {bnd, pivot_col, pairs}
+          {cols, pc, ps}
         else
-          {bnd, pivot_col, pairs} = reduce_column(bnd, pivot_col, pairs, j, ap_deaths)
-          {bnd, pivot_col, pairs}
+          reduce_column(cols, pc, ps, j, ap_deaths)
         end
       end)
 
-    # Essential simplices: those whose column is zero AND are not a pivot row
-    # ap_resolved covers both births and deaths of apparent pairs.
     pivot_rows = MapSet.new(Map.keys(pivot_col))
     paired_as_birth = MapSet.new(Enum.map(pairs, fn {i, _j} -> i end))
 
     essential =
-      Enum.filter(0..(filtration_size - 1), fn i ->
-        not Map.has_key?(reduced, i) and
+      Enum.filter(0..(size - 1), fn i ->
+        not Map.has_key?(reduced_cols, i) and
           not MapSet.member?(pivot_rows, i) and
           not MapSet.member?(paired_as_birth, i) and
           not MapSet.member?(ap_resolved, i)
       end)
 
+    reduced = %{bm | columns: reduced_cols, pairs: pairs, paired_as_birth: paired_as_birth}
     %{pairs: pairs, essential: essential, reduced: reduced}
   end
 
-  defp reduce_column(boundary, pivot_col, pairs, j, protected) do
-    case BoundaryMatrix.lowest(boundary, j) do
+  defp reduce_column(columns, pivot_col, pairs, j, protected) do
+    case col_lowest(columns, j) do
       nil ->
-        {boundary, pivot_col, pairs}
+        {columns, pivot_col, pairs}
 
       low ->
         case Map.get(pivot_col, low) do
           nil ->
-            # Pivot row is free — record pair.
-            # Clearing lemma: delete birth column unless it's a protected ap-death.
-            boundary =
+            columns =
               if MapSet.member?(protected, low),
-                do: boundary,
-                else: Map.delete(boundary, low)
+                do: columns,
+                else: Map.delete(columns, low)
 
-            {boundary, Map.put(pivot_col, low, j), [{low, j} | pairs]}
+            {columns, Map.put(pivot_col, low, j), [{low, j} | pairs]}
 
           i ->
-            boundary = BoundaryMatrix.add_columns(boundary, j, i)
-            reduce_column(boundary, pivot_col, pairs, j, protected)
+            columns = xor_columns(columns, j, i)
+            reduce_column(columns, pivot_col, pairs, j, protected)
         end
     end
+  end
+
+  defp col_lowest(columns, col) do
+    case Map.get(columns, col) do
+      nil -> nil
+      set -> if MapSet.size(set) == 0, do: nil, else: Enum.max(set)
+    end
+  end
+
+  defp xor_columns(columns, dst, src) do
+    col_dst = Map.get(columns, dst, MapSet.new())
+    col_src = Map.get(columns, src, MapSet.new())
+    result = MapSet.symmetric_difference(col_dst, col_src)
+
+    if MapSet.size(result) == 0,
+      do: Map.delete(columns, dst),
+      else: Map.put(columns, dst, result)
   end
 end

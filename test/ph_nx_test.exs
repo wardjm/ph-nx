@@ -153,141 +153,156 @@ defmodule PhNxTest do
 
   # ── BoundaryMatrix ───────────────────────────────────────────────────────────
 
-  describe "BoundaryMatrix.build/1" do
-    test "vertices have no boundary" do
+  describe "BoundaryMatrix.from_filtration/2" do
+    test "vertices-only filtration has no non-zero columns" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      {bnd, _} = BoundaryMatrix.build(f)
-      assert map_size(bnd) == 0
+      bm = BoundaryMatrix.from_filtration(f)
+      # No edges → to_tensor gives zero matrix
+      t = BoundaryMatrix.to_tensor(bm, length(f))
+      assert Nx.to_list(t) == [[0, 0], [0, 0]]
     end
 
-    test "edge boundary has exactly 2 rows set" do
+    test "edge columns each have exactly 2 non-zero rows" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      {bnd, _} = BoundaryMatrix.build(f)
-
-      edge_simplices = Enum.filter(f, &(&1.dim == 1))
-
-      Enum.each(edge_simplices, fn %{index: j} ->
-        col = Map.get(bnd, j, MapSet.new())
-        assert MapSet.size(col) == 2
-      end)
-    end
-  end
-
-  describe "BoundaryMatrix.lowest/2" do
-    test "returns max row index" do
-      bnd = %{3 => MapSet.new([1, 5, 2])}
-      assert BoundaryMatrix.lowest(bnd, 3) == 5
-    end
-
-    test "returns nil for missing column" do
-      assert BoundaryMatrix.lowest(%{}, 0) == nil
-    end
-
-    test "returns nil for empty column set" do
-      assert BoundaryMatrix.lowest(%{0 => MapSet.new()}, 0) == nil
-    end
-  end
-
-  describe "BoundaryMatrix.add_columns/3" do
-    test "XOR of identical columns gives empty column (removed from map)" do
-      bnd = %{0 => MapSet.new([1, 3]), 1 => MapSet.new([1, 3])}
-      result = BoundaryMatrix.add_columns(bnd, 0, 1)
-      refute Map.has_key?(result, 0)
-    end
-
-    test "XOR produces symmetric difference" do
-      bnd = %{0 => MapSet.new([1, 2, 3]), 1 => MapSet.new([2, 3, 4])}
-      result = BoundaryMatrix.add_columns(bnd, 0, 1)
-      assert MapSet.equal?(Map.fetch!(result, 0), MapSet.new([1, 4]))
-    end
-  end
-
-  describe "BoundaryMatrix.to_tensor/2" do
-    test "empty boundary produces zero matrix" do
-      t = BoundaryMatrix.to_tensor(%{}, 3)
-      assert Nx.shape(t) == {3, 3}
-      assert Nx.to_list(t) == [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
-    end
-
-    test "single entry sets correct cell" do
-      bnd = %{2 => MapSet.new([0, 1])}
-      t = BoundaryMatrix.to_tensor(bnd, 3)
-      mat = Nx.to_list(t)
-      # row 0, col 2 and row 1, col 2 should be 1
-      assert Enum.at(Enum.at(mat, 0), 2) == 1
-      assert Enum.at(Enum.at(mat, 1), 2) == 1
-      # all other cells zero
-      assert Enum.at(Enum.at(mat, 2), 2) == 0
-    end
-
-    test "matches boundary built from a real filtration" do
-      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
-      d = Distance.euclidean(pts)
-      f = Filtration.build(d, 1)
-      {bnd, _} = BoundaryMatrix.build(f)
+      bm = BoundaryMatrix.from_filtration(f)
       m = length(f)
-      t = BoundaryMatrix.to_tensor(bnd, m)
-      assert Nx.shape(t) == {m, m}
-      # Each edge column should have exactly 2 ones
+      t = BoundaryMatrix.to_tensor(bm, m)
+
       Enum.each(Enum.filter(f, &(&1.dim == 1)), fn %{index: j} ->
         col = t[[.., j]] |> Nx.to_list()
         assert Enum.sum(col) == 2
       end)
     end
+
+    test "triangle columns each have exactly 3 non-zero rows" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      bm = BoundaryMatrix.from_filtration(f)
+      m = length(f)
+      t = BoundaryMatrix.to_tensor(bm, m)
+
+      Enum.each(Enum.filter(f, &(&1.dim == 2)), fn %{index: j} ->
+        col = t[[.., j]] |> Nx.to_list()
+        assert Enum.sum(col) == 3
+      end)
+    end
+
+    test "seed_apparent: false produces same tensor as default (columns unchanged)" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm_default = BoundaryMatrix.from_filtration(f)
+      bm_bare = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      m = length(f)
+      assert BoundaryMatrix.to_tensor(bm_default, m) == BoundaryMatrix.to_tensor(bm_bare, m)
+    end
   end
 
-  # ── Apparent pairs ───────────────────────────────────────────────────────────
-
-  describe "Reduction.apparent_pairs/2" do
-    test "detects apparent pair in two-point filtration" do
-      # [0](idx 0), [1](idx 1), [0,1](idx 2)
-      # lowest([0,1]) = 1; highest coface of [1] = 2 → apparent pair (1, 2)
+  describe "BoundaryMatrix.lowest/2" do
+    test "returns max row index in a non-zero edge column" do
+      # Two-point filtration: [0] idx 0, [1] idx 1, [0,1] idx 2
+      # Column 2 has boundary {0, 1} → lowest = 1
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      {bnd, _} = BoundaryMatrix.build(f)
-      {pairs, _bnd2} = Reduction.apparent_pairs(bnd, f)
-      assert {1, 2} in pairs
+      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      assert BoundaryMatrix.lowest(bm, 2) == 1
     end
 
-    test "returns empty when no apparent pairs exist" do
-      # Single vertex — no edges, no pairs possible
+    test "returns nil for a vertex column (no boundary)" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      assert BoundaryMatrix.lowest(bm, 0) == nil
+    end
+
+    test "returns max face index for a triangle column (3 boundary rows)" do
+      # Right triangle: vertices 0,1,2 at indices 0-2; edges at 3-5; triangle at 6.
+      # Triangle boundary = {3, 4, 5}; lowest = max = 5.
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      tri = Enum.find(f, &(&1.dim == 2))
+
+      edge_indices =
+        Filtration.faces(tri)
+        |> Enum.map(fn verts -> Enum.find(f, &(&1.vertices == verts)).index end)
+
+      assert BoundaryMatrix.lowest(bm, tri.index) == Enum.max(edge_indices)
+    end
+
+    test "returns nil for a column absent from the matrix" do
       pts = Nx.tensor([[0.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      {bnd, _} = BoundaryMatrix.build(f)
-      {pairs, _} = Reduction.apparent_pairs(bnd, f)
-      assert pairs == []
+      bm = BoundaryMatrix.from_filtration(f)
+      assert BoundaryMatrix.lowest(bm, 99) == nil
+    end
+  end
+
+  describe "BoundaryMatrix.to_tensor/2" do
+    test "vertices-only filtration produces zero matrix" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 0)
+      bm = BoundaryMatrix.from_filtration(f)
+      t = BoundaryMatrix.to_tensor(bm, 3)
+      assert Nx.shape(t) == {3, 3}
+      assert Nx.to_list(t) == [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
     end
 
-    test "does not modify the boundary (columns needed for elimination)" do
+    test "two-point filtration: edge column has rows 0 and 1 set" do
+      # [0] idx 0, [1] idx 1, [0,1] idx 2 → column 2 = {0, 1}
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      {bnd, _} = BoundaryMatrix.build(f)
-      {[{_birth, death}], bnd2} = Reduction.apparent_pairs(bnd, f)
-      # Death column must be kept so other columns can eliminate against it
-      assert Map.has_key?(bnd2, death)
-      assert bnd == bnd2
+      bm = BoundaryMatrix.from_filtration(f)
+      t = BoundaryMatrix.to_tensor(bm, 3)
+      mat = Nx.to_list(t)
+      assert Enum.at(Enum.at(mat, 0), 2) == 1
+      assert Enum.at(Enum.at(mat, 1), 2) == 1
+      assert Enum.at(Enum.at(mat, 2), 2) == 0
+    end
+
+    test "dim=1 filtration: each edge column has exactly 2 ones, vertex columns are zero" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm = BoundaryMatrix.from_filtration(f)
+      m = length(f)
+      t = BoundaryMatrix.to_tensor(bm, m)
+      assert Nx.shape(t) == {m, m}
+
+      Enum.each(f, fn %{index: j, dim: dim} ->
+        col_sum = t[[.., j]] |> Nx.to_list() |> Enum.sum()
+        expected = if dim == 0, do: 0, else: 2
+
+        assert col_sum == expected,
+               "column #{j} (dim #{dim}) expected #{expected} ones, got #{col_sum}"
+      end)
     end
   end
 
   # ── Reduction ────────────────────────────────────────────────────────────────
 
-  describe "Reduction.reduce/3 (with apparent pairs)" do
-    test "produces same pairs and essential as reduce/2" do
+  describe "Reduction.reduce/1 (with apparent pairs pre-seeded)" do
+    test "produces same pairs and essential as bare-matrix reduction" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
-      {bnd, _} = BoundaryMatrix.build(f)
-      r2 = Reduction.reduce(bnd, length(f))
-      r3 = Reduction.reduce(bnd, length(f), f)
-      assert Enum.sort(r3.pairs) == Enum.sort(r2.pairs)
-      assert Enum.sort(r3.essential) == Enum.sort(r2.essential)
+      bm_bare = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      bm_seeded = BoundaryMatrix.from_filtration(f)
+      r_bare = Reduction.reduce(bm_bare)
+      r_seeded = Reduction.reduce(bm_seeded)
+      assert Enum.sort(r_seeded.pairs) == Enum.sort(r_bare.pairs)
+      assert Enum.sort(r_seeded.essential) == Enum.sort(r_bare.essential)
     end
 
     test "apparent pair is recorded directly in result (two-point filtration)" do
@@ -295,36 +310,35 @@ defmodule PhNxTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      {bnd, _} = BoundaryMatrix.build(f)
-      result = Reduction.reduce(bnd, length(f), f)
+      bm = BoundaryMatrix.from_filtration(f)
+      result = Reduction.reduce(bm)
       assert {1, 2} in result.pairs
       assert 0 in result.essential
     end
   end
 
-  describe "Reduction.reduce/2" do
+  describe "Reduction.reduce/1" do
     test "single vertex has no pairs, one essential class" do
       pts = Nx.tensor([[0.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      {bnd, _} = BoundaryMatrix.build(f)
-      result = Reduction.reduce(bnd, length(f))
+      bm = BoundaryMatrix.from_filtration(f)
+      result = Reduction.reduce(bm)
       assert result.pairs == []
       assert result.essential == [0]
     end
 
-    test "clearing: every birth column is absent from the reduced map" do
+    test "clearing: every birth column is absent from the reduced matrix" do
       # For any pair (i, j), column i is pre-cleared after the pair is claimed.
-      # This holds for H0 pairs (vertex birth, empty column) and for H1 pairs
-      # (edge birth, non-empty column) — the edge column must be gone.
+      # Uses seed_apparent: false so no ap-death columns are protected.
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
-      {bnd, _} = BoundaryMatrix.build(f)
-      %{pairs: pairs, reduced: reduced} = Reduction.reduce(bnd, length(f))
+      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      %{pairs: pairs, reduced: reduced} = Reduction.reduce(bm)
 
       Enum.each(pairs, fn {i, _j} ->
-        refute Map.has_key?(reduced, i),
+        assert BoundaryMatrix.lowest(reduced, i) == nil,
                "birth column #{i} should be cleared after pairing"
       end)
     end
@@ -333,8 +347,8 @@ defmodule PhNxTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      {bnd, _} = BoundaryMatrix.build(f)
-      result = Reduction.reduce(bnd, length(f))
+      bm = BoundaryMatrix.from_filtration(f)
+      result = Reduction.reduce(bm)
       assert length(result.pairs) == 1
       assert length(result.essential) == 1
     end

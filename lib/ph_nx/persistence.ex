@@ -83,10 +83,9 @@ defmodule PhNx.Persistence do
       |> Filtration.build(max_dim)
       |> maybe_threshold(threshold)
 
-    {boundary, _filtration} = BoundaryMatrix.build(filtration)
+    bm = BoundaryMatrix.from_filtration(filtration)
 
-    %{pairs: raw_pairs, essential: raw_essential} =
-      Reduction.reduce(boundary, length(filtration), filtration)
+    %{pairs: raw_pairs, essential: raw_essential} = Reduction.reduce(bm)
 
     # Map filtration indices back to (dim, birth) info
     idx_to_simplex = Map.new(filtration, fn s -> {s.index, s} end)
