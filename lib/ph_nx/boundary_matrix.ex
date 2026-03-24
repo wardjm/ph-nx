@@ -101,6 +101,64 @@ defmodule PhNx.BoundaryMatrix do
     end
   end
 
+  @doc """
+  Reduce all columns and return the finished matrix.
+
+  This is the full column-reduction loop over all columns. Apparent pairs
+  pre-seeded by `from_filtration/2` are respected — those columns are skipped.
+
+  Also accepts a filtration list as a convenience; equivalent to
+  `from_filtration(filtration) |> reduce()`. The list overload always uses
+  default `from_filtration/2` options (apparent pairs seeded).
+  """
+  @spec reduce(t()) :: t()
+  @spec reduce([Filtration.simplex()]) :: t()
+  def reduce(%__MODULE__{size: size} = bm) do
+    Enum.reduce(0..(size - 1), bm, fn col, acc ->
+      {_result, acc} = reduce_column(acc, col)
+      acc
+    end)
+  end
+
+  def reduce(filtration) when is_list(filtration) do
+    filtration |> from_filtration() |> reduce()
+  end
+
+  @doc """
+  Extract persistence pairs and essential simplex indices from a fully reduced matrix.
+
+  **Must be called after `reduce/1`.** Calling this on an unreduced matrix returns
+  silently incorrect results: only apparent pairs will appear in `pairs`, and
+  `essential` will be heavily overcounted.
+
+  Returns `{pairs, essential}` where:
+    * `pairs` is `[{birth_index, death_index}]` in reverse reduction order — sort if
+      stable output is required
+    * `essential` is `[simplex_index]` — simplices that create classes persisting to infinity
+
+  The four-condition essential-class filter is applied here and nowhere else.
+  """
+  @spec result(t()) :: {[{non_neg_integer(), non_neg_integer()}], [non_neg_integer()]}
+  def result(%__MODULE__{size: size} = bm) do
+    # pivot_col keys are the birth indices of all pairs (both apparent and reduction-found).
+    # paired_as_birth is maintained incrementally by reduce_column/2 and covers the same
+    # set; both conditions are kept to mirror the original Reduction.reduce/1 filter.
+    # Note: apparent-pair birth columns may still appear in bm.columns (they are protected
+    # from erasure when they are also an ap_death), so the first condition alone would
+    # incorrectly include them — the paired_as_birth/ap_resolved conditions exclude them.
+    pivot_rows = MapSet.new(Map.keys(bm.pivot_col))
+
+    essential =
+      Enum.filter(0..(size - 1), fn i ->
+        not Map.has_key?(bm.columns, i) and
+          not MapSet.member?(pivot_rows, i) and
+          not MapSet.member?(bm.paired_as_birth, i) and
+          not MapSet.member?(bm.ap_resolved, i)
+      end)
+
+    {bm.pairs, essential}
+  end
+
   @type column_result :: :already_resolved | :zero | :paired
 
   @doc """

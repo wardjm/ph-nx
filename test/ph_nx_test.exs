@@ -350,6 +350,105 @@ defmodule PhNxTest do
     end
   end
 
+  # ── BoundaryMatrix.reduce/1 and result/1 ─────────────────────────────────────
+
+  describe "BoundaryMatrix.reduce/1 (t())" do
+    test "two-point filtration: pairs and essential via result/1" do
+      # Filtration: v0(0), v1(1), e01(2). Pair: {1,2}. Essential: [0].
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      {pairs, essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+      assert {1, 2} in pairs
+      assert 0 in essential
+    end
+
+    test "triangle: result/1 essential has exactly one H0 and one H1 essential class" do
+      # 3-point right triangle (dim=2): v0,v1,v2 → edges → triangle fills the loop.
+      # Expected: 1 essential H0 (v0), triangle kills the H1 loop → no essential H1.
+      # But with seed_apparent: false the essential classes are indices: [0].
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      {pairs, essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+      # 2 edges kill 2 H0 classes; 1 triangle kills the H1 loop
+      assert length(pairs) == 3
+      # Only 1 essential class (the lone connected component, index 0)
+      assert essential == [0]
+    end
+
+    test "reduce(filtration) is equivalent to from_filtration |> reduce" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+
+      {pairs_via_list, essential_via_list} =
+        f |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+
+      {pairs_via_bm, essential_via_bm} =
+        f
+        |> BoundaryMatrix.from_filtration()
+        |> BoundaryMatrix.reduce()
+        |> BoundaryMatrix.result()
+
+      assert Enum.sort(pairs_via_list) == Enum.sort(pairs_via_bm)
+      assert Enum.sort(essential_via_list) == Enum.sort(essential_via_bm)
+    end
+
+    test "matches Reduction.reduce/1 pairs and essential on triangle (seeded)" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      bm = BoundaryMatrix.from_filtration(f)
+      %{pairs: r_pairs, essential: r_essential} = Reduction.reduce(bm)
+      {bm_pairs, bm_essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+      assert Enum.sort(bm_pairs) == Enum.sort(r_pairs)
+      assert Enum.sort(bm_essential) == Enum.sort(r_essential)
+    end
+
+    test "matches Reduction.reduce/1 pairs and essential on triangle (bare, no apparent pairs)" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 2)
+      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      %{pairs: r_pairs, essential: r_essential} = Reduction.reduce(bm)
+      {bm_pairs, bm_essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+      assert Enum.sort(bm_pairs) == Enum.sort(r_pairs)
+      assert Enum.sort(bm_essential) == Enum.sort(r_essential)
+    end
+
+    test "circle (unit square): reduce(filtration) |> result() asserts H1 {dim,birth,death}" do
+      # 4 points forming a unit square — the loop is born at edge length 1.0
+      # and killed at the first diagonal (length sqrt(2)).
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+      d = Distance.euclidean(pts)
+      threshold = Distance.enclosing_radius(d)
+      filtration = d |> Filtration.build(2) |> Enum.filter(&(&1.birth <= threshold))
+
+      {raw_pairs, _essential} =
+        filtration |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+
+      idx_map = Map.new(filtration, fn s -> {s.index, s} end)
+
+      triples =
+        raw_pairs
+        |> Enum.map(fn {i, j} ->
+          si = Map.fetch!(idx_map, i)
+          sj = Map.fetch!(idx_map, j)
+          {si.dim, si.birth, sj.birth}
+        end)
+        |> Enum.filter(fn {_dim, birth, death} -> birth < death end)
+
+      h1 = Enum.filter(triples, fn {d, _, _} -> d == 1 end)
+      assert length(h1) == 1
+      [{1, birth, death}] = h1
+      assert_in_delta birth, 1.0, 1.0e-9
+      assert_in_delta death, :math.sqrt(2), 1.0e-9
+    end
+  end
+
   # ── Reduction ────────────────────────────────────────────────────────────────
 
   describe "Reduction.reduce/1 (with apparent pairs pre-seeded)" do
