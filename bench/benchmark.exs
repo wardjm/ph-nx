@@ -1,10 +1,42 @@
 #!/usr/bin/env mix run
-# Usage:
-#   mix run bench/benchmark.exs
-#   mix run bench/benchmark.exs -- --points 30
-#   mix run bench/benchmark.exs -- --points 100 --file path/to/cloud.txt
 
 defmodule Bench do
+  @moduledoc """
+  Benchmark script for PhNx performance.
+
+  ## Usage
+
+      mix run bench/benchmark.exs
+      mix run bench/benchmark.exs -- --points 30
+      mix run bench/benchmark.exs -- --points 100 --file path/to/cloud.txt
+      mix run bench/benchmark.exs -- --max_dim 3
+
+  ## Options
+
+  - `--points N`   — use only the first N points from the file (default: all)
+  - `--file PATH`  — path to a tab-separated point cloud file (default: test/fixtures/o3_50.txt)
+  - `--max_dim D`  — maximum simplex dimension (default: 2)
+
+  ## Phases
+
+  Each backend run reports timing for four phases:
+
+  - **distance matrix** — pairwise Euclidean distances via Nx (trivially GPU-accelerated)
+  - **filtration** — Vietoris-Rips simplex construction, truncated at the enclosing radius
+  - **boundary matrix** — sparse F₂ boundary representation
+  - **reduction** — column reduction with apparent pairs optimisation (CPU-bound)
+
+  ## Interpreting results
+
+  Two backends are attempted in sequence; EXLA is skipped gracefully if unavailable:
+
+  - **BinaryBackend** — pure Elixir, no GPU required
+  - **EXLA (CPU)** — XLA-compiled; expect ~57× speedup on distance matrix, minimal gain on reduction
+
+  Reduction typically dominates (~80% of total time) regardless of backend.
+  Use the `--threshold` option (via `PhNx.compute/2`) or a lower `--max_dim` to
+  reduce simplex count and bring reduction time down.
+  """
   @default_file "test/fixtures/o3_50.txt"
   @warmup_runs 2
   @timed_runs 5
