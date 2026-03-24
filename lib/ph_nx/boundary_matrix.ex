@@ -43,7 +43,7 @@ defmodule PhNx.BoundaryMatrix do
   Build a BoundaryMatrix from a filtration.
 
   By default, runs the apparent-pairs pre-pass to seed `pivot_col`, `pairs`,
-  `ap_resolved`, and `ap_deaths`, so that `Reduction.reduce/1` can skip those
+  `ap_resolved`, and `ap_deaths`, so that `reduce/1` can skip those
   columns entirely.
 
   Options:
@@ -142,7 +142,7 @@ defmodule PhNx.BoundaryMatrix do
   def result(%__MODULE__{size: size} = bm) do
     # pivot_col keys are the birth indices of all pairs (both apparent and reduction-found).
     # paired_as_birth is maintained incrementally by reduce_column/2 and covers the same
-    # set; both conditions are kept to mirror the original Reduction.reduce/1 filter.
+    # set; both conditions are kept for correctness.
     # Note: apparent-pair birth columns may still appear in bm.columns (they are protected
     # from erasure when they are also an ap_death), so the first condition alone would
     # incorrectly include them — the paired_as_birth/ap_resolved conditions exclude them.

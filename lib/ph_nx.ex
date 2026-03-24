@@ -19,8 +19,7 @@ defmodule PhNx do
   Modules:
     - `PhNx.Distance`       — Nx-powered pairwise Euclidean distance matrix
     - `PhNx.Filtration`     — Vietoris-Rips filtration construction
-    - `PhNx.BoundaryMatrix` — sparse boundary matrix over F₂
-    - `PhNx.Reduction`      — standard persistence algorithm
+    - `PhNx.BoundaryMatrix` — sparse boundary matrix over F₂, including column reduction
     - `PhNx.Persistence`    — high-level API and output formatting
   """
 

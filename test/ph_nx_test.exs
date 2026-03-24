@@ -1,7 +1,7 @@
 defmodule PhNxTest do
   use ExUnit.Case, async: true
 
-  alias PhNx.{Distance, Filtration, BoundaryMatrix, Reduction, Persistence}
+  alias PhNx.{Distance, Filtration, BoundaryMatrix, Persistence}
 
   # ── Distance ────────────────────────────────────────────────────────────────
 
@@ -397,26 +397,14 @@ defmodule PhNxTest do
       assert Enum.sort(essential_via_list) == Enum.sort(essential_via_bm)
     end
 
-    test "matches Reduction.reduce/1 pairs and essential on triangle (seeded)" do
+    test "triangle (seeded apparent pairs): 3 pairs, 1 essential" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
       bm = BoundaryMatrix.from_filtration(f)
-      %{pairs: r_pairs, essential: r_essential} = Reduction.reduce(bm)
-      {bm_pairs, bm_essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
-      assert Enum.sort(bm_pairs) == Enum.sort(r_pairs)
-      assert Enum.sort(bm_essential) == Enum.sort(r_essential)
-    end
-
-    test "matches Reduction.reduce/1 pairs and essential on triangle (bare, no apparent pairs)" do
-      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
-      d = Distance.euclidean(pts)
-      f = Filtration.build(d, 2)
-      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
-      %{pairs: r_pairs, essential: r_essential} = Reduction.reduce(bm)
-      {bm_pairs, bm_essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
-      assert Enum.sort(bm_pairs) == Enum.sort(r_pairs)
-      assert Enum.sort(bm_essential) == Enum.sort(r_essential)
+      {pairs, essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+      assert length(pairs) == 3
+      assert essential == [0]
     end
 
     test "circle (unit square): reduce(filtration) |> result() asserts H1 {dim,birth,death}" do
@@ -449,67 +437,58 @@ defmodule PhNxTest do
     end
   end
 
-  # ── Reduction ────────────────────────────────────────────────────────────────
+  # ── BoundaryMatrix outcome tests (seeded vs bare, single vertex, two vertices) ─
 
-  describe "Reduction.reduce/1 (with apparent pairs pre-seeded)" do
-    test "produces same pairs and essential as bare-matrix reduction" do
+  describe "BoundaryMatrix.reduce/1 outcome (additional)" do
+    test "seeded and bare apparent-pair matrix yield same pairs and essential" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
-      bm_bare = BoundaryMatrix.from_filtration(f, seed_apparent: false)
-      bm_seeded = BoundaryMatrix.from_filtration(f)
-      r_bare = Reduction.reduce(bm_bare)
-      r_seeded = Reduction.reduce(bm_seeded)
-      assert Enum.sort(r_seeded.pairs) == Enum.sort(r_bare.pairs)
-      assert Enum.sort(r_seeded.essential) == Enum.sort(r_bare.essential)
+
+      {pairs_bare, essential_bare} =
+        f
+        |> BoundaryMatrix.from_filtration(seed_apparent: false)
+        |> BoundaryMatrix.reduce()
+        |> BoundaryMatrix.result()
+
+      {pairs_seeded, essential_seeded} =
+        f
+        |> BoundaryMatrix.from_filtration()
+        |> BoundaryMatrix.reduce()
+        |> BoundaryMatrix.result()
+
+      assert Enum.sort(pairs_seeded) == Enum.sort(pairs_bare)
+      assert Enum.sort(essential_seeded) == Enum.sort(essential_bare)
     end
 
-    test "apparent pair is recorded directly in result (two-point filtration)" do
-      # Filtration: v0(0), v1(1), e01(2). Apparent pair: (1, 2).
-      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
-      d = Distance.euclidean(pts)
-      f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.from_filtration(f)
-      result = Reduction.reduce(bm)
-      assert {1, 2} in result.pairs
-      assert 0 in result.essential
-    end
-  end
-
-  describe "Reduction.reduce/1" do
-    test "single vertex has no pairs, one essential class" do
+    test "single vertex: no pairs, one essential class" do
       pts = Nx.tensor([[0.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      bm = BoundaryMatrix.from_filtration(f)
-      result = Reduction.reduce(bm)
-      assert result.pairs == []
-      assert result.essential == [0]
-    end
 
-    test "clearing: every birth column is absent from the reduced matrix" do
-      # For any pair (i, j), column i is pre-cleared after the pair is claimed.
-      # Uses seed_apparent: false so no ap-death columns are protected.
-      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
-      d = Distance.euclidean(pts)
-      f = Filtration.build(d, 2)
-      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
-      %{pairs: pairs, reduced: reduced} = Reduction.reduce(bm)
+      {pairs, essential} =
+        f
+        |> BoundaryMatrix.from_filtration()
+        |> BoundaryMatrix.reduce()
+        |> BoundaryMatrix.result()
 
-      Enum.each(pairs, fn {i, _j} ->
-        assert BoundaryMatrix.lowest(reduced, i) == nil,
-               "birth column #{i} should be cleared after pairing"
-      end)
+      assert pairs == []
+      assert essential == [0]
     end
 
     test "two isolated vertices: one edge pair kills one H0 class" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.from_filtration(f)
-      result = Reduction.reduce(bm)
-      assert length(result.pairs) == 1
-      assert length(result.essential) == 1
+
+      {pairs, essential} =
+        f
+        |> BoundaryMatrix.from_filtration()
+        |> BoundaryMatrix.reduce()
+        |> BoundaryMatrix.result()
+
+      assert length(pairs) == 1
+      assert length(essential) == 1
     end
   end
 
