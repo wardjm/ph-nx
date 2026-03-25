@@ -82,12 +82,14 @@ defmodule PhNx.EdgeCasesTest do
 
   describe "Boundary Conditions" do
     test "points exactly on unit circle" do
-      pts = Nx.tensor([
-        [1.0, 0.0],
-        [0.0, 1.0],
-        [-1.0, 0.0],
-        [0.0, -1.0]
-      ])
+      pts =
+        Nx.tensor([
+          [1.0, 0.0],
+          [0.0, 1.0],
+          [-1.0, 0.0],
+          [0.0, -1.0]
+        ])
+
       result = Persistence.compute(pts, max_dim: 2)
       # 4 points form a triangulated 2-sphere (boundary of tetrahedron):
       # H0 = 1 essential, H1 = 1 finite pair (loop born sqrt(2), dies at 2.0),
@@ -354,7 +356,9 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
-      {pairs, essential} = BoundaryMatrix.from_filtration(f) |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+
+      {pairs, essential} =
+        BoundaryMatrix.from_filtration(f) |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
 
       assert length(pairs) == 3
       assert length(essential) == 1
