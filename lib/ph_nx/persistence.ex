@@ -78,6 +78,11 @@ defmodule PhNx.Persistence do
     threshold =
       Keyword.get_lazy(opts, :threshold, fn -> Distance.enclosing_radius(dist) end)
 
+    unless threshold == :infinity or (is_number(threshold) and threshold >= 0) do
+      raise ArgumentError,
+            "threshold must be :infinity or a non-negative number, got: #{inspect(threshold)}"
+    end
+
     filtration =
       dist
       |> Filtration.build(max_dim)
