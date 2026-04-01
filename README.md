@@ -81,6 +81,47 @@ PhNx.most_persistent(result, 5) # => [{dim, birth, death, persistence}, ...]
 | `PhNx.Reduction` | Standard persistence algorithm (column reduction) |
 | `PhNx.Persistence` | Pairs extraction, barcode formatting |
 
+## Command-line tool
+
+A Mix task is provided for exploring the library from the command line.
+
+```
+mix ph_nx <file> [--max-dim N] [--threshold T]
+```
+
+The input file should contain one point per line with coordinates comma-separated. Blank lines and lines starting with `#` are ignored.
+
+```
+# unit square
+0.0,0.0
+1.0,0.0
+1.0,1.0
+0.0,1.0
+```
+
+```
+$ mix ph_nx square.txt
+
+Computing persistent homology for 4 points in 2D...
+
+Persistence Barcode
+──────────────────────────────────────────────────
+
+H0 (4 bars):
+  [0.0000, 1.0000)  persistence: 1.0000
+  [0.0000, 1.0000)  persistence: 1.0000
+  [0.0000, 1.0000)  persistence: 1.0000
+  [0.0000, ∞)
+
+H1 (1 bar):
+  [1.0000, 1.4142)  persistence: 0.4142
+
+Betti numbers:
+  β0 = 1
+```
+
+Points can be in any dimension as long as all points in the file have the same number of coordinates. The `--max-dim` and `--threshold` options correspond directly to the options for `PhNx.compute/2`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.

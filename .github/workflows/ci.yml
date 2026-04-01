@@ -14,3 +14,4 @@ jobs:
       - run: mix deps.get
       - run: mix format --check-formatted
       - run: mix test
+      - run: bash test/cli_test.sh
