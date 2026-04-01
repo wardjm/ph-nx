@@ -4,7 +4,7 @@ defmodule PhNx.CLI do
 
   ## Usage
 
-      ph_nx <file>
+      ph_nx <file> [options]
 
   The file should contain one point per line, with coordinates comma-separated:
 
@@ -19,6 +19,12 @@ defmodule PhNx.CLI do
 
       --max-dim N     Maximum homology dimension to compute (default: 2)
       --threshold T   Distance threshold for filtration (default: enclosing radius)
+      --help          Show this help message
+
+  ## Building the escript
+
+      mix escript.build
+      ./ph_nx <file>
   """
 
   def main(args) do
@@ -30,19 +36,24 @@ defmodule PhNx.CLI do
     cond do
       invalid != [] ->
         IO.puts(:stderr, "Unknown option(s): #{Enum.map_join(invalid, ", ", fn {k, _} -> k end)}")
-        print_usage()
-        System.halt(1)
+        print_usage(:stderr)
+        exit({:shutdown, 1})
 
       opts[:help] ->
-        print_usage()
+        print_usage(:stdio)
 
       positional == [] ->
         IO.puts(:stderr, "Error: no input file specified")
-        print_usage()
-        System.halt(1)
+        print_usage(:stderr)
+        exit({:shutdown, 1})
+
+      length(positional) > 1 ->
+        IO.puts(:stderr, "Error: too many arguments (expected one file, got #{length(positional)})")
+        print_usage(:stderr)
+        exit({:shutdown, 1})
 
       true ->
-        [file | _] = positional
+        [file] = positional
         run(file, opts)
     end
   end
@@ -55,7 +66,7 @@ defmodule PhNx.CLI do
 
         {:error, reason} ->
           IO.puts(:stderr, "Error reading #{file}: #{reason}")
-          System.halt(1)
+          exit({:shutdown, 1})
       end
 
     compute_opts =
@@ -72,8 +83,8 @@ defmodule PhNx.CLI do
 
     IO.puts("\nBetti numbers:")
 
-    Enum.each(betti, fn {dim, count} ->
-      IO.puts("  β#{dim} = #{count}")
+    Enum.each(betti, fn {d, count} ->
+      IO.puts("  β#{d} = #{count}")
     end)
   end
 
@@ -88,9 +99,13 @@ defmodule PhNx.CLI do
           |> String.split("\n", trim: true)
           |> Enum.reject(&(String.trim(&1) == "" or String.starts_with?(String.trim(&1), "#")))
 
-        case parse_points(lines) do
-          {:error, _} = err -> err
-          points -> {:ok, points}
+        if lines == [] do
+          {:error, "file contains no data points"}
+        else
+          case parse_points(lines) do
+            {:error, _} = err -> err
+            points -> {:ok, points}
+          end
         end
     end
   end
@@ -124,8 +139,8 @@ defmodule PhNx.CLI do
   defp maybe_put(opts, _key, nil), do: opts
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
 
-  defp print_usage do
-    IO.puts("""
+  defp print_usage(device) do
+    IO.puts(device, """
     Usage: ph_nx <file> [options]
 
     Compute persistent homology from a point cloud file.

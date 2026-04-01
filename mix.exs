@@ -9,6 +9,7 @@ defmodule PhNx.MixProject do
       description: "Persistent homology computation for Elixir using Nx",
       source_url: "https://github.com/wardjm/ph-nx",
       homepage_url: "https://github.com/wardjm/ph-nx",
+      escript: [main_module: PhNx.CLI],
       docs: [
         main: "readme",
         extras: ["README.md", "docs/performance.md"]
