@@ -48,7 +48,11 @@ defmodule PhNx.CLI do
         exit({:shutdown, 1})
 
       length(positional) > 1 ->
-        IO.puts(:stderr, "Error: too many arguments (expected one file, got #{length(positional)})")
+        IO.puts(
+          :stderr,
+          "Error: too many arguments (expected one file, got #{length(positional)})"
+        )
+
         print_usage(:stderr)
         exit({:shutdown, 1})
 

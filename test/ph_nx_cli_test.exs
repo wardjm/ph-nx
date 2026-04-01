@@ -3,7 +3,9 @@ defmodule PhNx.CLITest do
   import ExUnit.CaptureIO
 
   defp tmp_file(contents) do
-    path = Path.join(System.tmp_dir!(), "ph_nx_cli_test_#{System.unique_integer([:positive])}.txt")
+    path =
+      Path.join(System.tmp_dir!(), "ph_nx_cli_test_#{System.unique_integer([:positive])}.txt")
+
     File.write!(path, contents)
     path
   end
