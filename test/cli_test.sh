@@ -70,7 +70,7 @@ assert_exit   "no args exits non-zero"       1       mix ph_nx
 assert_stderr "no args prints error"         "no input file" mix ph_nx
 
 assert_exit   "unknown flag exits non-zero"  1       mix ph_nx --bogus
-assert_stderr "unknown flag prints error"    "Unknown option" mix ph_nx --bogus
+assert_stderr "unknown flag prints error"    "Invalid option" mix ph_nx --bogus
 
 assert_exit   "multiple files exits non-zero" 1      mix ph_nx a.txt b.txt
 assert_stderr "multiple files prints error"  "too many" mix ph_nx a.txt b.txt
@@ -79,10 +79,10 @@ assert_stderr "multiple files prints error"  "too many" mix ph_nx a.txt b.txt
 assert_exit   "missing file exits non-zero"  1       mix ph_nx /nonexistent/points.txt
 assert_stderr "missing file prints error"    "Error reading" mix ph_nx /nonexistent/points.txt
 
-assert_exit   "empty file exits non-zero"    1       mix ph_nx "$EMPTY"
+assert_exit   "empty file exits 2"           2       mix ph_nx "$EMPTY"
 assert_stderr "empty file prints friendly error" "no data points" mix ph_nx "$EMPTY"
 
-assert_exit   "invalid coords exits non-zero" 1      mix ph_nx "$INVALID"
+assert_exit   "invalid coords exits 2"       2       mix ph_nx "$INVALID"
 assert_stderr "invalid coords names the line" "line 2" mix ph_nx "$INVALID"
 
 # ── successful runs ─────────────────────────────────────────────────────────
