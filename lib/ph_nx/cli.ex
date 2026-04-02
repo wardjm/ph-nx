@@ -35,12 +35,20 @@ defmodule PhNx.CLI do
 
     cond do
       invalid != [] ->
-        IO.puts(:stderr, "Unknown option(s): #{Enum.map_join(invalid, ", ", fn {k, _} -> k end)}")
+        IO.puts(
+          :stderr,
+          "Invalid option(s): #{Enum.map_join(invalid, ", ", fn
+            {k, nil} -> k
+            {k, v} -> "#{k}=#{v}"
+          end)}"
+        )
+
         print_usage(:stderr)
         exit({:shutdown, 1})
 
       opts[:help] ->
         print_usage(:stdio)
+        exit({:shutdown, 0})
 
       positional == [] ->
         IO.puts(:stderr, "Error: no input file specified")
@@ -68,9 +76,13 @@ defmodule PhNx.CLI do
         {:ok, pts} ->
           pts
 
-        {:error, reason} ->
+        {:error, :file, reason} ->
           IO.puts(:stderr, "Error reading #{file}: #{reason}")
           exit({:shutdown, 1})
+
+        {:error, :format, reason} ->
+          IO.puts(:stderr, "Error: #{reason}")
+          exit({:shutdown, 2})
       end
 
     compute_opts =
@@ -95,7 +107,7 @@ defmodule PhNx.CLI do
   defp read_points(file) do
     case File.read(file) do
       {:error, reason} ->
-        {:error, :file.format_error(reason)}
+        {:error, :file, :file.format_error(reason)}
 
       {:ok, contents} ->
         lines =
@@ -104,10 +116,10 @@ defmodule PhNx.CLI do
           |> Enum.reject(&(String.trim(&1) == "" or String.starts_with?(String.trim(&1), "#")))
 
         if lines == [] do
-          {:error, "file contains no data points"}
+          {:error, :format, "file contains no data points"}
         else
           case parse_points(lines) do
-            {:error, _} = err -> err
+            {:error, reason} -> {:error, :format, reason}
             points -> {:ok, points}
           end
         end

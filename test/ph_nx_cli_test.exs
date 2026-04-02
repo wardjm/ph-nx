@@ -12,7 +12,7 @@ defmodule PhNx.CLITest do
 
   describe "main/1 - argument parsing" do
     test "prints usage to stdout with --help" do
-      output = capture_io(fn -> PhNx.CLI.main(["--help"]) end)
+      output = capture_io(fn -> catch_exit(PhNx.CLI.main(["--help"])) end)
       assert output =~ "Usage:"
       assert output =~ "--max-dim"
     end
@@ -23,7 +23,7 @@ defmodule PhNx.CLITest do
           catch_exit(PhNx.CLI.main(["--unknown"]))
         end)
 
-      assert output =~ "Unknown option"
+      assert output =~ "Invalid option"
     end
 
     test "errors when no file is given" do
@@ -42,6 +42,62 @@ defmodule PhNx.CLITest do
         end)
 
       assert output =~ "too many arguments"
+    end
+  end
+
+  describe "main/1 - exit codes" do
+    test "exits with code 0 for --help" do
+      capture_io(fn ->
+        assert catch_exit(PhNx.CLI.main(["--help"])) == {:shutdown, 0}
+      end)
+    end
+
+    test "exits with code 1 for invalid option" do
+      capture_io(:stderr, fn ->
+        assert catch_exit(PhNx.CLI.main(["--unknown"])) == {:shutdown, 1}
+      end)
+    end
+
+    test "exits with code 1 for option with invalid value type" do
+      capture_io(:stderr, fn ->
+        assert catch_exit(PhNx.CLI.main(["--threshold=abc"])) == {:shutdown, 1}
+      end)
+    end
+
+    test "exits with code 1 when no file given" do
+      capture_io(:stderr, fn ->
+        assert catch_exit(PhNx.CLI.main([])) == {:shutdown, 1}
+      end)
+    end
+
+    test "exits with code 1 when too many files given" do
+      capture_io(:stderr, fn ->
+        assert catch_exit(PhNx.CLI.main(["a.txt", "b.txt"])) == {:shutdown, 1}
+      end)
+    end
+
+    test "exits with code 1 when file does not exist" do
+      capture_io(:stderr, fn ->
+        assert catch_exit(PhNx.CLI.main(["/nonexistent/path/points.txt"])) == {:shutdown, 1}
+      end)
+    end
+
+    test "exits with code 2 on invalid coordinates" do
+      path = tmp_file("0.0,0.0\n1.0,bad\n")
+      on_exit(fn -> File.rm(path) end)
+
+      capture_io(:stderr, fn ->
+        assert catch_exit(PhNx.CLI.main([path])) == {:shutdown, 2}
+      end)
+    end
+
+    test "exits with code 2 when file has no data points" do
+      path = tmp_file("# just a comment\n\n")
+      on_exit(fn -> File.rm(path) end)
+
+      capture_io(:stderr, fn ->
+        assert catch_exit(PhNx.CLI.main([path])) == {:shutdown, 2}
+      end)
     end
   end
 
