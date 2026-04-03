@@ -17,17 +17,24 @@ defmodule PhNx.PersistenceTest do
       assert custom_result == default_result
     end
 
-    test "calls custom boundary_builder when provided" do
+    test "calls custom boundary_builder and its result propagates to the output" do
       test_pid = self()
 
-      custom_builder = fn filtration, _opts ->
+      custom_builder = fn filtration, opts ->
         send(test_pid, :custom_builder_called)
-        BoundaryMatrix.build_from_filtration(filtration)
+        BoundaryMatrix.build_from_filtration(filtration, opts)
       end
 
-      Persistence.compute(@points, boundary_builder: custom_builder)
+      result = Persistence.compute(@points, boundary_builder: custom_builder)
 
       assert_received :custom_builder_called
+      assert %{pairs: _, essential: _, diagram: _} = result
+    end
+
+    test "raises ArgumentError when boundary_builder is not a 2-arity function" do
+      assert_raise ArgumentError, ~r/boundary_builder must be a 2-arity function/, fn ->
+        Persistence.compute(@points, boundary_builder: :not_a_function)
+      end
     end
   end
 end

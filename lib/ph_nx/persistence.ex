@@ -36,6 +36,9 @@ defmodule PhNx.Persistence do
           diagram: [diagram_entry()]
         }
 
+  @typedoc "A function that builds a BoundaryMatrix from a filtration and options."
+  @type boundary_builder :: ([Filtration.simplex()], keyword() -> BoundaryMatrix.t())
+
   @doc """
   Compute persistent homology for a point cloud.
 
@@ -58,8 +61,6 @@ defmodule PhNx.Persistence do
       diagram:   [{dim, birth, death | :infinity}]  # union of pairs + essential
     }
   """
-  @type boundary_builder :: ([Filtration.simplex()], keyword() -> BoundaryMatrix.t())
-
   @spec compute(Nx.Tensor.t() | [[number()]], keyword()) :: result()
   def compute(points, opts \\ []) do
     opts = Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder])
@@ -95,7 +96,13 @@ defmodule PhNx.Persistence do
       |> maybe_threshold(threshold)
 
     builder = Keyword.get(opts, :boundary_builder, &BoundaryMatrix.build_from_filtration/2)
-    reduced = builder.(filtration, []) |> BoundaryMatrix.reduce()
+
+    unless is_function(builder, 2) do
+      raise ArgumentError, "boundary_builder must be a 2-arity function, got: #{inspect(builder)}"
+    end
+
+    builder_opts = Keyword.delete(opts, :boundary_builder)
+    reduced = builder.(filtration, builder_opts) |> BoundaryMatrix.reduce()
     raw_pairs = BoundaryMatrix.pairs(reduced)
     raw_essential = BoundaryMatrix.essential(reduced)
 
