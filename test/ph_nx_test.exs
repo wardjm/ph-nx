@@ -358,7 +358,10 @@ defmodule PhNxTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = f |> BoundaryMatrix.build_from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
+
+      bm =
+        f |> BoundaryMatrix.build_from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
+
       assert {1, 2} in BoundaryMatrix.pairs(bm)
     end
 
@@ -379,7 +382,10 @@ defmodule PhNxTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = f |> BoundaryMatrix.build_from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
+
+      bm =
+        f |> BoundaryMatrix.build_from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
+
       assert BoundaryMatrix.essential(bm) == [0]
     end
 
@@ -406,7 +412,10 @@ defmodule PhNxTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.build_from_filtration(f, seed_apparent: false) |> BoundaryMatrix.reduce()
+
+      bm =
+        BoundaryMatrix.build_from_filtration(f, seed_apparent: false) |> BoundaryMatrix.reduce()
+
       assert {1, 2} in BoundaryMatrix.pairs(bm)
       assert 0 in BoundaryMatrix.essential(bm)
     end
@@ -418,7 +427,10 @@ defmodule PhNxTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
-      bm = BoundaryMatrix.build_from_filtration(f, seed_apparent: false) |> BoundaryMatrix.reduce()
+
+      bm =
+        BoundaryMatrix.build_from_filtration(f, seed_apparent: false) |> BoundaryMatrix.reduce()
+
       # 2 edges kill 2 H0 classes; 1 triangle kills the H1 loop
       assert length(BoundaryMatrix.pairs(bm)) == 3
       # Only 1 essential class (the lone connected component, index 0)
@@ -486,10 +498,13 @@ defmodule PhNxTest do
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
 
-      bm_bare = f |> BoundaryMatrix.build_from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
+      bm_bare =
+        f |> BoundaryMatrix.build_from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
+
       bm_seeded = f |> BoundaryMatrix.build_from_filtration() |> BoundaryMatrix.reduce()
 
-      assert Enum.sort(BoundaryMatrix.pairs(bm_seeded)) == Enum.sort(BoundaryMatrix.pairs(bm_bare))
+      assert Enum.sort(BoundaryMatrix.pairs(bm_seeded)) ==
+               Enum.sort(BoundaryMatrix.pairs(bm_bare))
 
       assert Enum.sort(BoundaryMatrix.essential(bm_seeded)) ==
                Enum.sort(BoundaryMatrix.essential(bm_bare))

@@ -163,7 +163,10 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
-      bm = BoundaryMatrix.build_from_filtration(f, seed_apparent: false) |> BoundaryMatrix.reduce()
+
+      bm =
+        BoundaryMatrix.build_from_filtration(f, seed_apparent: false) |> BoundaryMatrix.reduce()
+
       pairs = BoundaryMatrix.pairs(bm)
       essential = BoundaryMatrix.essential(bm)
 
