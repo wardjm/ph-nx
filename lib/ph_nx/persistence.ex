@@ -36,6 +36,9 @@ defmodule PhNx.Persistence do
           diagram: [diagram_entry()]
         }
 
+  @typedoc "A function that builds a BoundaryMatrix from a filtration and options."
+  @type boundary_builder :: ([Filtration.simplex()], keyword() -> BoundaryMatrix.t())
+
   @doc """
   Compute persistent homology for a point cloud.
 
@@ -46,6 +49,10 @@ defmodule PhNx.Persistence do
       born after this filtration value. The enclosing radius is the smallest value at which
       all points are connected, so the default produces the most topologically meaningful
       filtration. Pass `threshold: :infinity` to include all simplices regardless of scale.
+    - `boundary_builder` (`(filtration, opts -> BoundaryMatrix.t())`, default:
+      `&BoundaryMatrix.build_from_filtration/2`): function used to construct the boundary
+      matrix from the filtered simplex list. Override to inject alternative implementations
+      (e.g. GPU-accelerated, pre-seeded, or test doubles).
 
   Returns a map:
     %{
@@ -56,7 +63,7 @@ defmodule PhNx.Persistence do
   """
   @spec compute(Nx.Tensor.t() | [[number()]], keyword()) :: result()
   def compute(points, opts \\ []) do
-    opts = Keyword.validate!(opts, [:max_dim, :threshold])
+    opts = Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder])
     max_dim = Keyword.get(opts, :max_dim, 2)
 
     if not is_integer(max_dim) or max_dim < 0 do
@@ -88,7 +95,14 @@ defmodule PhNx.Persistence do
       |> Filtration.build(max_dim)
       |> maybe_threshold(threshold)
 
-    reduced = filtration |> BoundaryMatrix.reduce()
+    builder = Keyword.get(opts, :boundary_builder, &BoundaryMatrix.build_from_filtration/2)
+
+    unless is_function(builder, 2) do
+      raise ArgumentError, "boundary_builder must be a 2-arity function, got: #{inspect(builder)}"
+    end
+
+    builder_opts = Keyword.delete(opts, :boundary_builder)
+    reduced = builder.(filtration, builder_opts) |> BoundaryMatrix.reduce()
     raw_pairs = BoundaryMatrix.pairs(reduced)
     raw_essential = BoundaryMatrix.essential(reduced)
 
