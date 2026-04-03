@@ -152,21 +152,23 @@ defmodule PhNx.EdgeCasesTest do
     end
   end
 
-  describe "BoundaryMatrix.result/1 edge cases" do
-    test "nil column returns empty result" do
-      bm = BoundaryMatrix.from_filtration([]) |> BoundaryMatrix.reduce()
-      {pairs, essential} = bm |> BoundaryMatrix.result()
-      assert pairs == []
-      assert essential == []
+  describe "BoundaryMatrix reduce edge cases" do
+    test "nil column returns empty pairs and essential" do
+      bm = BoundaryMatrix.build_from_filtration([]) |> BoundaryMatrix.reduce()
+      assert BoundaryMatrix.pairs(bm) == []
+      assert BoundaryMatrix.essential(bm) == []
     end
 
     test "essential classes respect four-condition" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
-      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
 
-      {pairs, essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+      bm =
+        BoundaryMatrix.build_from_filtration(f, seed_apparent: false) |> BoundaryMatrix.reduce()
+
+      pairs = BoundaryMatrix.pairs(bm)
+      essential = BoundaryMatrix.essential(bm)
 
       Enum.each(essential, fn idx ->
         not_in_pairs = Enum.all?(pairs, fn {i, _j} -> i != idx end)
@@ -178,9 +180,9 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.from_filtration(f)
-
-      {_, essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
+      bm = BoundaryMatrix.build_from_filtration(f)
+      reduced = bm |> BoundaryMatrix.reduce()
+      essential = BoundaryMatrix.essential(reduced)
 
       # Vertex 0 is the surviving component (essential); vertex 1 is paired with the edge
       assert 0 in essential
@@ -281,7 +283,7 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.from_filtration(f)
+      bm = BoundaryMatrix.build_from_filtration(f)
 
       # The edge column (index 2) is resolved as an apparent pair during seeding
       {:already_resolved, bm2} = BoundaryMatrix.reduce_column(bm, 2)
@@ -292,7 +294,7 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      bm = BoundaryMatrix.from_filtration(f)
+      bm = BoundaryMatrix.build_from_filtration(f)
 
       {:zero, bm2} = BoundaryMatrix.reduce_column(bm, 0)
       assert bm2 == bm
@@ -302,7 +304,7 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      bm = BoundaryMatrix.build_from_filtration(f, seed_apparent: false)
 
       {:paired, bm2} = BoundaryMatrix.reduce_column(bm, 2)
       assert Map.has_key?(bm2.pivot_col, 1)
@@ -317,7 +319,7 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.from_filtration(f)
+      bm = BoundaryMatrix.build_from_filtration(f)
       m = length(f)
       t = BoundaryMatrix.as_tensor(bm, m)
       assert Nx.shape(t) == {m, m}
@@ -327,7 +329,7 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      bm = BoundaryMatrix.build_from_filtration(f, seed_apparent: false)
       m = length(f)
       t = BoundaryMatrix.as_tensor(bm, m)
 
@@ -341,7 +343,7 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
-      bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
+      bm = BoundaryMatrix.build_from_filtration(f, seed_apparent: false)
       t = BoundaryMatrix.as_tensor(bm, 3)
 
       col = t[[.., 2]] |> Nx.to_list()
@@ -356,12 +358,9 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 2)
-
-      {pairs, essential} =
-        BoundaryMatrix.from_filtration(f) |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
-
-      assert length(pairs) == 3
-      assert length(essential) == 1
+      bm = BoundaryMatrix.build_from_filtration(f) |> BoundaryMatrix.reduce()
+      assert length(BoundaryMatrix.pairs(bm)) == 3
+      assert length(BoundaryMatrix.essential(bm)) == 1
     end
   end
 

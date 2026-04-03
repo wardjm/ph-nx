@@ -116,9 +116,9 @@ defmodule PhNx.ErrorConditionsTest do
 
   # ── Boundary Matrix Edge Tests ────────────────────────────────────────────
 
-  describe "BoundaryMatrix.from_filtration/2" do
+  describe "BoundaryMatrix.build_from_filtration/2" do
     test "empty filtration creates empty matrix" do
-      bm = BoundaryMatrix.from_filtration([])
+      bm = BoundaryMatrix.build_from_filtration([])
       assert bm.size == 0
       assert bm.columns == %{}
       assert bm.pivot_col == %{}
@@ -130,7 +130,7 @@ defmodule PhNx.ErrorConditionsTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      bm = BoundaryMatrix.from_filtration(f)
+      bm = BoundaryMatrix.build_from_filtration(f)
 
       Enum.each(0..1, fn i ->
         assert is_nil(BoundaryMatrix.lowest(bm, i))
@@ -143,7 +143,7 @@ defmodule PhNx.ErrorConditionsTest do
       pts = Nx.tensor([[0.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      bm = BoundaryMatrix.from_filtration(f)
+      bm = BoundaryMatrix.build_from_filtration(f)
       assert is_nil(BoundaryMatrix.lowest(bm, 99))
     end
   end
@@ -153,7 +153,7 @@ defmodule PhNx.ErrorConditionsTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      bm = BoundaryMatrix.from_filtration(f)
+      bm = BoundaryMatrix.build_from_filtration(f)
       m = length(f)
       t = BoundaryMatrix.as_tensor(bm, m)
       assert Nx.shape(t) == {m, m}
@@ -162,23 +162,19 @@ defmodule PhNx.ErrorConditionsTest do
   end
 
   describe "BoundaryMatrix.reduce/1" do
-    test "empty filtration result" do
-      {pairs, essential} =
-        BoundaryMatrix.from_filtration([]) |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
-
-      assert pairs == []
-      assert essential == []
+    test "empty filtration: no pairs, no essential" do
+      bm = BoundaryMatrix.build_from_filtration([]) |> BoundaryMatrix.reduce()
+      assert BoundaryMatrix.pairs(bm) == []
+      assert BoundaryMatrix.essential(bm) == []
     end
 
     test "one point: one essential class" do
       pts = Nx.tensor([[0.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
-      bm = BoundaryMatrix.from_filtration(f)
-
-      {pairs, essential} = bm |> BoundaryMatrix.reduce() |> BoundaryMatrix.result()
-      assert pairs == []
-      assert essential == [0]
+      bm = BoundaryMatrix.build_from_filtration(f) |> BoundaryMatrix.reduce()
+      assert BoundaryMatrix.pairs(bm) == []
+      assert BoundaryMatrix.essential(bm) == [0]
     end
   end
 

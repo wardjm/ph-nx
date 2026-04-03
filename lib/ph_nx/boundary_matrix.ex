@@ -1,22 +1,26 @@
 defmodule PhNx.BoundaryMatrix do
   @moduledoc """
-  Opaque boundary matrix for a filtration, with pre-seeded apparent pairs.
+  Opaque boundary matrix for a filtration.
 
-  The boundary matrix ∂ is an (m×m) matrix over F₂ where m is the number of simplices.
-  Entry ∂[i, j] = 1 if simplex i is a codimension-1 face of simplex j.
+  ## Public interface
 
-  Internally the matrix is stored sparsely as a map of column index to the set of nonzero
-  row indices. All reduction state (`pivot_col`, `pairs`, `ap_resolved`, `ap_deaths`,
-  `paired_as_birth`) is co-located in the same struct but is not accessible to callers.
-
-  ## Example
+  Build a boundary matrix with `build_from_filtration/2`, reduce it with `reduce/1`,
+  then read results via `pairs/1` and `essential/1`.
 
       points = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       dist = PhNx.Distance.euclidean(points)
       filtration = PhNx.Filtration.build(dist, 1)
-      bm = PhNx.BoundaryMatrix.from_filtration(filtration)
-      # Vertices have no boundary; apparent pairs are pre-seeded automatically.
-      # Edges can be inspected via as_tensor/2 or lowest/2.
+      bm = filtration |> PhNx.BoundaryMatrix.build_from_filtration() |> PhNx.BoundaryMatrix.reduce()
+      pairs = PhNx.BoundaryMatrix.pairs(bm)
+      essential = PhNx.BoundaryMatrix.essential(bm)
+
+  ## Implementation details (opaque)
+
+  The reduction algorithm, internal struct shape, and all intermediate state
+  (`pivot_col`, `ap_resolved`, `ap_deaths`) are implementation details and are
+  not part of the public API. The matrix is stored sparsely as a map of column
+  index to the set of nonzero row indices; an apparent-pairs pre-pass seeds
+  the pivot map before the standard column-reduction loop runs.
   """
 
   alias PhNx.Filtration
@@ -46,6 +50,8 @@ defmodule PhNx.BoundaryMatrix do
   @doc """
   Build a BoundaryMatrix from a filtration.
 
+  This is the canonical public entry point for constructing a boundary matrix.
+
   By default, runs the apparent-pairs pre-pass to seed `pivot_col`, `pairs`,
   `ap_resolved`, and `ap_deaths`, so that `reduce/1` can skip those
   columns entirely.
@@ -54,8 +60,12 @@ defmodule PhNx.BoundaryMatrix do
     * `seed_apparent: false` — skip the apparent-pairs pre-pass. Produces a
       bare matrix useful for testing reduction without the pre-pass optimisation.
   """
-  @spec from_filtration([Filtration.simplex()], keyword()) :: t()
-  def from_filtration(filtration, opts \\ []) do
+  @spec build_from_filtration([Filtration.simplex()], keyword()) :: t()
+  def build_from_filtration(filtration, opts \\ []) do
+    from_filtration(filtration, opts)
+  end
+
+  defp from_filtration(filtration, opts \\ []) do
     seed_apparent = Keyword.get(opts, :seed_apparent, true)
     index_map = Filtration.index_map(filtration)
     columns = build_columns(filtration, index_map)
@@ -109,11 +119,11 @@ defmodule PhNx.BoundaryMatrix do
   Reduce all columns and return the finished matrix.
 
   This is the full column-reduction loop over all columns. Apparent pairs
-  pre-seeded by `from_filtration/2` are respected — those columns are skipped.
+  pre-seeded by `build_from_filtration/2` are respected — those columns are skipped.
 
   Also accepts a filtration list as a convenience; equivalent to
-  `from_filtration(filtration) |> reduce()`. The list overload always uses
-  default `from_filtration/2` options (apparent pairs seeded).
+  `build_from_filtration(filtration) |> reduce()`. The list overload always uses
+  default `build_from_filtration/2` options (apparent pairs seeded).
   """
   @spec reduce(t()) :: t()
   @spec reduce([Filtration.simplex()]) :: t()
@@ -128,7 +138,7 @@ defmodule PhNx.BoundaryMatrix do
   end
 
   def reduce(filtration) when is_list(filtration) do
-    filtration |> from_filtration() |> reduce()
+    filtration |> build_from_filtration() |> reduce()
   end
 
   @doc """
@@ -158,27 +168,6 @@ defmodule PhNx.BoundaryMatrix do
       )
 
   def essential(%__MODULE__{} = bm), do: do_essential(bm)
-
-  @doc """
-  Extract persistence pairs and essential simplex indices from a fully reduced matrix.
-
-  **Must be called after `reduce/1`.** Raises `ArgumentError` if called on an
-  unreduced matrix.
-
-  Returns `{pairs, essential}` where:
-    * `pairs` is `[{birth_index, death_index}]` in reverse reduction order — sort if
-      stable output is required
-    * `essential` is `[simplex_index]` — simplices that create classes persisting to infinity
-  """
-  @spec result(t()) :: {[{non_neg_integer(), non_neg_integer()}], [non_neg_integer()]}
-  def result(%__MODULE__{reduced: false}),
-    do:
-      raise(
-        ArgumentError,
-        "result/1 called on an unreduced BoundaryMatrix — call reduce/1 first"
-      )
-
-  def result(%__MODULE__{} = bm), do: {bm.pairs, do_essential(bm)}
 
   @doc """
   Perform one step of the standard column reduction algorithm on column `col`.
@@ -293,7 +282,7 @@ defmodule PhNx.BoundaryMatrix do
   end
 
   # Invariant: keys(pivot_col) = apparent-pair births ∪ reduction-found births.
-  # Apparent pairs seed pivot_col in from_filtration/2; reduction pairs add to pivot_col
+  # Apparent pairs seed pivot_col in build_from_filtration/2; reduction pairs add to pivot_col
   # in do_reduce_column/2. Both paths land in pivot_col, so a single membership check
   # here covers all paired births.
   # ap_resolved additionally excludes apparent-pair death columns, which can remain in
