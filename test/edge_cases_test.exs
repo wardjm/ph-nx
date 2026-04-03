@@ -310,16 +310,16 @@ defmodule PhNx.EdgeCasesTest do
     end
   end
 
-  # ── BoundaryMatrix.to_tensor/2 ────────────────────────────────────────────
+  # ── BoundaryMatrix.as_tensor/2 ────────────────────────────────────────────
 
-  describe "BoundaryMatrix.to_tensor/2 shape and content" do
+  describe "BoundaryMatrix.as_tensor/2 shape and content" do
     test "shape is {m, m} for a filtration of size m" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
       bm = BoundaryMatrix.from_filtration(f)
       m = length(f)
-      t = BoundaryMatrix.to_tensor(bm, m)
+      t = BoundaryMatrix.as_tensor(bm, m)
       assert Nx.shape(t) == {m, m}
     end
 
@@ -329,7 +329,7 @@ defmodule PhNx.EdgeCasesTest do
       f = Filtration.build(d, 1)
       bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
       m = length(f)
-      t = BoundaryMatrix.to_tensor(bm, m)
+      t = BoundaryMatrix.as_tensor(bm, m)
 
       Enum.each(0..1, fn i ->
         col = t[[.., i]] |> Nx.to_list()
@@ -342,7 +342,7 @@ defmodule PhNx.EdgeCasesTest do
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
       bm = BoundaryMatrix.from_filtration(f, seed_apparent: false)
-      t = BoundaryMatrix.to_tensor(bm, 3)
+      t = BoundaryMatrix.as_tensor(bm, 3)
 
       col = t[[.., 2]] |> Nx.to_list()
       assert Enum.count(col, &(&1 == 1)) == 2

@@ -159,8 +159,8 @@ defmodule PhNxTest do
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
       bm = BoundaryMatrix.from_filtration(f)
-      # No edges → to_tensor gives zero matrix
-      t = BoundaryMatrix.to_tensor(bm, length(f))
+      # No edges → as_tensor gives zero matrix
+      t = BoundaryMatrix.as_tensor(bm, length(f))
       assert Nx.to_list(t) == [[0, 0], [0, 0]]
     end
 
@@ -170,7 +170,7 @@ defmodule PhNxTest do
       f = Filtration.build(d, 1)
       bm = BoundaryMatrix.from_filtration(f)
       m = length(f)
-      t = BoundaryMatrix.to_tensor(bm, m)
+      t = BoundaryMatrix.as_tensor(bm, m)
 
       Enum.each(Enum.filter(f, &(&1.dim == 1)), fn %{index: j} ->
         col = t[[.., j]] |> Nx.to_list()
@@ -184,7 +184,7 @@ defmodule PhNxTest do
       f = Filtration.build(d, 2)
       bm = BoundaryMatrix.from_filtration(f)
       m = length(f)
-      t = BoundaryMatrix.to_tensor(bm, m)
+      t = BoundaryMatrix.as_tensor(bm, m)
 
       Enum.each(Enum.filter(f, &(&1.dim == 2)), fn %{index: j} ->
         col = t[[.., j]] |> Nx.to_list()
@@ -199,7 +199,7 @@ defmodule PhNxTest do
       bm_default = BoundaryMatrix.from_filtration(f)
       bm_bare = BoundaryMatrix.from_filtration(f, seed_apparent: false)
       m = length(f)
-      assert BoundaryMatrix.to_tensor(bm_default, m) == BoundaryMatrix.to_tensor(bm_bare, m)
+      assert BoundaryMatrix.as_tensor(bm_default, m) == BoundaryMatrix.as_tensor(bm_bare, m)
     end
   end
 
@@ -247,13 +247,13 @@ defmodule PhNxTest do
     end
   end
 
-  describe "BoundaryMatrix.to_tensor/2" do
+  describe "BoundaryMatrix.as_tensor/2" do
     test "vertices-only filtration produces zero matrix" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 0)
       bm = BoundaryMatrix.from_filtration(f)
-      t = BoundaryMatrix.to_tensor(bm, 3)
+      t = BoundaryMatrix.as_tensor(bm, 3)
       assert Nx.shape(t) == {3, 3}
       assert Nx.to_list(t) == [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
     end
@@ -264,7 +264,7 @@ defmodule PhNxTest do
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
       bm = BoundaryMatrix.from_filtration(f)
-      t = BoundaryMatrix.to_tensor(bm, 3)
+      t = BoundaryMatrix.as_tensor(bm, 3)
       mat = Nx.to_list(t)
       assert Enum.at(Enum.at(mat, 0), 2) == 1
       assert Enum.at(Enum.at(mat, 1), 2) == 1
@@ -277,7 +277,7 @@ defmodule PhNxTest do
       f = Filtration.build(d, 1)
       bm = BoundaryMatrix.from_filtration(f)
       m = length(f)
-      t = BoundaryMatrix.to_tensor(bm, m)
+      t = BoundaryMatrix.as_tensor(bm, m)
       assert Nx.shape(t) == {m, m}
 
       Enum.each(f, fn %{index: j, dim: dim} ->
@@ -347,6 +347,48 @@ defmodule PhNxTest do
       # The birth edge (e23, the one cleared) should now have lowest=nil.
       e23 = Enum.find(f, &(&1.vertices == [2, 3]))
       assert BoundaryMatrix.lowest(bm2, e23.index) == nil
+    end
+  end
+
+  # ── BoundaryMatrix.pairs/1 ──────────────────────────────────────────────────
+
+  describe "BoundaryMatrix.pairs/1" do
+    test "returns pairs list from a reduced matrix" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm = f |> BoundaryMatrix.from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
+      {expected, _} = BoundaryMatrix.result(bm)
+      assert BoundaryMatrix.pairs(bm) == expected
+    end
+
+    test "raises ArgumentError on an unreduced matrix" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm = BoundaryMatrix.from_filtration(f)
+      assert_raise ArgumentError, ~r/unreduced/, fn -> BoundaryMatrix.pairs(bm) end
+    end
+  end
+
+  # ── BoundaryMatrix.essential/1 ──────────────────────────────────────────────
+
+  describe "BoundaryMatrix.essential/1" do
+    test "returns essential list from a reduced matrix" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm = f |> BoundaryMatrix.from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
+      {_, expected} = BoundaryMatrix.result(bm)
+      assert BoundaryMatrix.essential(bm) == expected
+    end
+
+    test "raises ArgumentError on an unreduced matrix" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 1)
+      bm = BoundaryMatrix.from_filtration(f)
+      assert_raise ArgumentError, ~r/unreduced/, fn -> BoundaryMatrix.essential(bm) end
     end
   end
 

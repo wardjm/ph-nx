@@ -148,8 +148,8 @@ defmodule PhNx.ErrorConditionsTest do
     end
   end
 
-  describe "BoundaryMatrix.to_tensor/2" do
-    test "empty filtration has size 0 (to_tensor not applicable)" do
+  describe "BoundaryMatrix.as_tensor/2" do
+    test "empty filtration has size 0 (as_tensor not applicable)" do
       bm = BoundaryMatrix.from_filtration([])
       assert bm.size == 0
     end
