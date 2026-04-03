@@ -148,10 +148,16 @@ defmodule PhNx.ErrorConditionsTest do
     end
   end
 
-  describe "BoundaryMatrix.to_tensor/2" do
-    test "empty filtration has size 0 (to_tensor not applicable)" do
-      bm = BoundaryMatrix.from_filtration([])
-      assert bm.size == 0
+  describe "BoundaryMatrix.as_tensor/2" do
+    test "produces an all-zero tensor for a vertices-only filtration" do
+      pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
+      d = Distance.euclidean(pts)
+      f = Filtration.build(d, 0)
+      bm = BoundaryMatrix.from_filtration(f)
+      m = length(f)
+      t = BoundaryMatrix.as_tensor(bm, m)
+      assert Nx.shape(t) == {m, m}
+      assert Nx.to_list(t) == [[0, 0], [0, 0]]
     end
   end
 
