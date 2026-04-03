@@ -353,13 +353,13 @@ defmodule PhNxTest do
   # ── BoundaryMatrix.pairs/1 ──────────────────────────────────────────────────
 
   describe "BoundaryMatrix.pairs/1" do
-    test "returns pairs list from a reduced matrix" do
+    test "returns [{birth_idx, death_idx}] from a reduced matrix" do
+      # Two-point filtration: v0(0), v1(1), e01(2). Pair: {1, 2}.
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
       bm = f |> BoundaryMatrix.from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
-      {expected, _} = BoundaryMatrix.result(bm)
-      assert BoundaryMatrix.pairs(bm) == expected
+      assert {1, 2} in BoundaryMatrix.pairs(bm)
     end
 
     test "raises ArgumentError on an unreduced matrix" do
@@ -374,13 +374,13 @@ defmodule PhNxTest do
   # ── BoundaryMatrix.essential/1 ──────────────────────────────────────────────
 
   describe "BoundaryMatrix.essential/1" do
-    test "returns essential list from a reduced matrix" do
+    test "returns [simplex_idx] of infinite classes from a reduced matrix" do
+      # Two-point filtration: v0(0), v1(1), e01(2). v0 is the lone essential H0.
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0]])
       d = Distance.euclidean(pts)
       f = Filtration.build(d, 1)
       bm = f |> BoundaryMatrix.from_filtration(seed_apparent: false) |> BoundaryMatrix.reduce()
-      {_, expected} = BoundaryMatrix.result(bm)
-      assert BoundaryMatrix.essential(bm) == expected
+      assert BoundaryMatrix.essential(bm) == [0]
     end
 
     test "raises ArgumentError on an unreduced matrix" do

@@ -157,49 +157,28 @@ defmodule PhNx.BoundaryMatrix do
         "essential/1 called on an unreduced BoundaryMatrix — call reduce/1 first"
       )
 
-  def essential(%__MODULE__{size: size} = bm) do
-    pivot_rows = MapSet.new(Map.keys(bm.pivot_col))
-
-    Enum.filter(0..(size - 1)//1, fn i ->
-      not Map.has_key?(bm.columns, i) and
-        not MapSet.member?(pivot_rows, i) and
-        not MapSet.member?(bm.ap_resolved, i)
-    end)
-  end
+  def essential(%__MODULE__{} = bm), do: do_essential(bm)
 
   @doc """
   Extract persistence pairs and essential simplex indices from a fully reduced matrix.
 
-  **Must be called after `reduce/1`.** Calling this on an unreduced matrix returns
-  silently incorrect results: only apparent pairs will appear in `pairs`, and
-  `essential` will be heavily overcounted.
+  **Must be called after `reduce/1`.** Raises `ArgumentError` if called on an
+  unreduced matrix.
 
   Returns `{pairs, essential}` where:
     * `pairs` is `[{birth_index, death_index}]` in reverse reduction order — sort if
       stable output is required
     * `essential` is `[simplex_index]` — simplices that create classes persisting to infinity
-
-  The four-condition essential-class filter is applied here and nowhere else.
   """
   @spec result(t()) :: {[{non_neg_integer(), non_neg_integer()}], [non_neg_integer()]}
-  def result(%__MODULE__{size: size} = bm) do
-    # Invariant: keys(pivot_col) = apparent-pair births ∪ reduction-found births.
-    # Apparent pairs seed pivot_col in from_filtration/2; reduction pairs add to pivot_col
-    # in do_reduce_column/2. Both paths land in pivot_col, so a single membership check
-    # here covers all paired births.
-    # ap_resolved additionally excludes apparent-pair death columns, which can remain in
-    # bm.columns when the death index is also a birth in another pair.
-    pivot_rows = MapSet.new(Map.keys(bm.pivot_col))
+  def result(%__MODULE__{reduced: false}),
+    do:
+      raise(
+        ArgumentError,
+        "result/1 called on an unreduced BoundaryMatrix — call reduce/1 first"
+      )
 
-    essential =
-      Enum.filter(0..(size - 1)//1, fn i ->
-        not Map.has_key?(bm.columns, i) and
-          not MapSet.member?(pivot_rows, i) and
-          not MapSet.member?(bm.ap_resolved, i)
-      end)
-
-    {bm.pairs, essential}
-  end
+  def result(%__MODULE__{} = bm), do: {bm.pairs, do_essential(bm)}
 
   @doc """
   Perform one step of the standard column reduction algorithm on column `col`.
@@ -311,5 +290,21 @@ defmodule PhNx.BoundaryMatrix do
     if MapSet.size(result) == 0,
       do: Map.delete(columns, dst),
       else: Map.put(columns, dst, result)
+  end
+
+  # Invariant: keys(pivot_col) = apparent-pair births ∪ reduction-found births.
+  # Apparent pairs seed pivot_col in from_filtration/2; reduction pairs add to pivot_col
+  # in do_reduce_column/2. Both paths land in pivot_col, so a single membership check
+  # here covers all paired births.
+  # ap_resolved additionally excludes apparent-pair death columns, which can remain in
+  # bm.columns when the death index is also a birth in another pair.
+  defp do_essential(%__MODULE__{size: size} = bm) do
+    pivot_rows = MapSet.new(Map.keys(bm.pivot_col))
+
+    Enum.filter(0..(size - 1)//1, fn i ->
+      not Map.has_key?(bm.columns, i) and
+        not MapSet.member?(pivot_rows, i) and
+        not MapSet.member?(bm.ap_resolved, i)
+    end)
   end
 end

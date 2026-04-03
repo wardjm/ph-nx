@@ -154,7 +154,7 @@ defmodule PhNx.EdgeCasesTest do
 
   describe "BoundaryMatrix.result/1 edge cases" do
     test "nil column returns empty result" do
-      bm = BoundaryMatrix.from_filtration([])
+      bm = BoundaryMatrix.from_filtration([]) |> BoundaryMatrix.reduce()
       {pairs, essential} = bm |> BoundaryMatrix.result()
       assert pairs == []
       assert essential == []
