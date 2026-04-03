@@ -1,7 +1,14 @@
 defmodule PhNx.RipserComparisonTest do
   use ExUnit.Case, async: false
 
+  alias PhNx.BoundaryMatrix
+
   @tolerance 1.0e-4
+
+  # Equilateral triangle — topology is fully determined analytically:
+  #   H0: 1 essential class born at 0.0 (one connected component)
+  #   H1: 1 finite pair (loop born when 2nd edge added, killed when 2-simplex added)
+  @triangle Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.5, 0.866]])
 
   # ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -97,7 +104,59 @@ defmodule PhNx.RipserComparisonTest do
     end
   end
 
-  # ── Test cases ───────────────────────────────────────────────────────────────
+  # ── Pipeline isolation tests ─────────────────────────────────────────────────
+
+  describe "pipeline isolation via boundary_builder:" do
+    test "spy: builder is called and receives the filtration" do
+      test_pid = self()
+
+      spy = fn filtration, opts ->
+        send(test_pid, {:called, length(filtration)})
+        BoundaryMatrix.build_from_filtration(filtration, opts)
+      end
+
+      PhNx.compute(@triangle, max_dim: 2, boundary_builder: spy)
+
+      assert_received {:called, size}
+      assert size > 0
+    end
+
+    test "stub bypassing apparent-pairs pre-pass produces identical output to default" do
+      stub = fn filtration, opts ->
+        BoundaryMatrix.build_from_filtration(filtration, Keyword.put(opts, :seed_apparent, false))
+      end
+
+      default = PhNx.compute(@triangle, max_dim: 2)
+      stubbed = PhNx.compute(@triangle, max_dim: 2, boundary_builder: stub)
+
+      assert stubbed == default
+    end
+
+    test "pipeline maps filtration indices to correct H0 essential class for known triangle" do
+      spy = fn filtration, opts -> BoundaryMatrix.build_from_filtration(filtration, opts) end
+
+      result = PhNx.compute(@triangle, max_dim: 2, boundary_builder: spy)
+
+      h0_essentials = Enum.filter(result.essential, fn {dim, _birth} -> dim == 0 end)
+      assert length(h0_essentials) == 1
+      {0, birth} = hd(h0_essentials)
+      assert_in_delta birth, 0.0, 1.0e-10
+    end
+
+    test "pipeline filters degenerate pairs: equilateral triangle's H1 loop (birth == death) is excluded" do
+      # In a VR filtration on an equilateral triangle, the H1 cycle is born and killed
+      # at the same filtration value (when the last edge and the 2-simplex are both added).
+      # The pipeline's birth < death filter must remove such degenerate pairs.
+      spy = fn filtration, opts -> BoundaryMatrix.build_from_filtration(filtration, opts) end
+
+      result = PhNx.compute(@triangle, max_dim: 2, boundary_builder: spy)
+
+      h1_pairs = Enum.filter(result.pairs, fn {dim, _b, _d} -> dim == 1 end)
+      assert h1_pairs == []
+    end
+  end
+
+  # ── Ripser comparison tests ───────────────────────────────────────────────────
   #
   # Each entry: {label, points_file, ripser_output_file, hom_dim}
   # ripser output was captured via: ripser --format point-cloud --dim <hom_dim> <points_file>
