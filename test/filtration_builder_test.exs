@@ -26,8 +26,8 @@ defmodule PhNx.FiltrationBuilderTest do
     filtration = FiltrationBuilder.build(@tri, max_dim: 2, threshold: 1.0)
     assert Enum.all?(filtration, fn s -> s.birth <= 1.0 end)
     assert length(filtration) == 5
-    assert Enum.any?(filtration, fn s -> not(s.vertices == [1, 2]) end)
-    assert Enum.any?(filtration, fn s -> not(s.vertices == [0, 1, 2]) end)
+    assert Enum.any?(filtration, fn s -> not (s.vertices == [1, 2]) end)
+    assert Enum.any?(filtration, fn s -> not (s.vertices == [0, 1, 2]) end)
   end
 
   test "threshold :infinity returns full filtration" do
