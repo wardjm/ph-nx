@@ -22,7 +22,7 @@ defmodule PhNx.FiltrationBuilder do
   @type options :: [max_dim: integer() | nil, threshold: number() | :infinity | nil]
 
   @spec build(Nx.Tensor.t() | [[number()]], options()) :: [Filtration.simplex()]
-  def build(point_cloud, opts \ []) do
+  def build(point_cloud, opts \\ []) do
     opts = Keyword.validate!(opts, [:max_dim, :threshold])
     max_dim = Keyword.get(opts, :max_dim, 2)
     threshold = Keyword.get(opts, :threshold, :infinity)
@@ -44,11 +44,15 @@ defmodule PhNx.FiltrationBuilder do
 
     # Apply thresholding if needed
     cond do
-      threshold == :infinity -> full
+      threshold == :infinity ->
+        full
+
       is_number(threshold) and threshold >= 0 ->
         Enum.filter(full, fn %{birth: b} -> b <= threshold end)
+
       true ->
-        raise ArgumentError, "threshold must be :infinity or a non-negative number, got: #{inspect(threshold)}"
+        raise ArgumentError,
+              "threshold must be :infinity or a non-negative number, got: #{inspect(threshold)}"
     end
   end
 end
