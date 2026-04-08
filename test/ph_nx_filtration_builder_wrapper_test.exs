@@ -114,12 +114,12 @@ defmodule PhNx.FiltrationBuilderWrapperTest do
     test "computes full filtration for unit square" do
       filtration = PhNx.filtration_builder(@square)
       assert is_list(filtration)
-      
+
       # Should have vertices, edges, and 2-simplices
       vertices = Enum.filter(filtration, fn s -> s.dim == 0 end)
       edges = Enum.filter(filtration, fn s -> s.dim == 1 end)
       faces = Enum.filter(filtration, fn s -> s.dim == 2 end)
-      
+
       assert length(vertices) == 4
       assert length(edges) > 0
       assert length(faces) > 0
@@ -127,14 +127,14 @@ defmodule PhNx.FiltrationBuilderWrapperTest do
 
     test "unit square with max_dim 1 for TDA pipeline" do
       filtration = PhNx.filtration_builder(@square, max_dim: 1)
-      
+
       # Only vertices and edges
       assert Enum.all?(filtration, fn s -> s.dim <= 1 end)
-      
+
       # Should have 4 vertices and 6 edges (4 sides + 2 diagonals)
       vertices = Enum.filter(filtration, fn s -> s.dim == 0 end)
       edges = Enum.filter(filtration, fn s -> s.dim == 1 end)
-      
+
       assert length(vertices) == 4
       assert length(edges) == 6
     end
