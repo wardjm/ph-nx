@@ -19,8 +19,17 @@ defmodule PhNx do
   Modules:
     - `PhNx.Distance`       — Nx-powered pairwise Euclidean distance matrix
     - `PhNx.Filtration`     — Vietoris-Rips filtration construction
+    - `PhNx.FiltrationBuilder` — convenient wrapper for building filtrations with options
     - `PhNx.BoundaryMatrix` — sparse boundary matrix over F₂, including column reduction
     - `PhNx.Persistence`    — high-level API and output formatting
+
+  ## Functions
+
+    - `compute/1`, `compute/2`     — compute persistent homology of a point cloud
+    - `print_barcode/1`            — print the barcode visualization
+    - `most_persistent/1`, `most_persistent/2` — get the most persistent features
+    - `betti_numbers/1`            — get Betti numbers for each dimension
+    - `filtration_builder/1`, `filtration_builder/2` — build Vietoris-Rips filtration with options
   """
 
   @spec compute(Nx.Tensor.t() | [[number()]], keyword()) :: PhNx.Persistence.result()
@@ -36,4 +45,10 @@ defmodule PhNx do
   @spec betti_numbers(PhNx.Persistence.result()) ::
           %{optional(non_neg_integer()) => non_neg_integer()}
   defdelegate betti_numbers(result), to: PhNx.Persistence
+
+  @spec filtration_builder(Nx.Tensor.t() | [[number()]]) :: [PhNx.Filtration.simplex()]
+  defdelegate filtration_builder(points), to: PhNx.FiltrationBuilder, as: :build
+
+  @spec filtration_builder(Nx.Tensor.t() | [[number()]], keyword()) :: [PhNx.Filtration.simplex()]
+  defdelegate filtration_builder(points, opts), to: PhNx.FiltrationBuilder, as: :build
 end
