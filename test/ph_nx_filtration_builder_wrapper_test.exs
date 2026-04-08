@@ -108,6 +108,11 @@ defmodule PhNx.FiltrationBuilderWrapperTest do
         PhNx.filtration_builder(@tri, threshold: -1)
       end
     end
+    test "raises on unknown option" do
+      assert_raise ArgumentError, fn ->
+        PhNx.filtration_builder(@tri, unknown_opt: 1)
+      end
+    end
   end
 
   describe "integration with unit square" do
