@@ -91,8 +91,7 @@ defmodule PhNx.FiltrationBuilderWrapperTest do
 
   describe "error handling" do
     test "raises on empty point cloud" do
-      # Empty lists cause an error when building Nx.tensor
-      assert_raise RuntimeError, "cannot build empty tensor", fn ->
+      assert_raise ArgumentError, ~r/non-empty/, fn ->
         PhNx.filtration_builder([])
       end
     end
