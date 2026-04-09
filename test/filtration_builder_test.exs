@@ -9,7 +9,7 @@ defmodule PhNx.FiltrationBuilderTest do
     [0.0, 1.0]
   ]
 
-  # Tetrahedron: 3 axis-aligned edges (dist=1.0), 3 cross-axis edges (dist=√2≈1.414)
+  # Unit right-angle corner in 3D: 3 axis-aligned edges (dist=1.0), 3 cross-axis edges (dist=√2≈1.414)
   @tet [
     [0.0, 0.0, 0.0],
     [1.0, 0.0, 0.0],
@@ -79,6 +79,16 @@ defmodule PhNx.FiltrationBuilderTest do
     assert Enum.all?(filt, fn s -> s.birth <= 1.0 end)
     # 4 vertices + 3 axis-aligned edges
     assert length(filt) == 7
+
+    surviving_edges = filt |> Enum.filter(&(&1.dim == 1)) |> Enum.map(& &1.vertices)
+    assert surviving_edges == [[0, 1], [0, 2], [0, 3]]
+  end
+
+  test "3D max_dim=2 includes triangles but not tetrahedron" do
+    # C(4,1) + C(4,2) + C(4,3) = 4 + 6 + 4 = 14
+    filt = FiltrationBuilder.build(@tet, max_dim: 2)
+    assert length(filt) == 14
+    assert Enum.all?(filt, fn s -> s.dim <= 2 end)
   end
 
   test "every simplex has required Filtration struct fields" do
@@ -99,10 +109,10 @@ defmodule PhNx.FiltrationBuilderTest do
     assert list_result == tensor_result
   end
 
-  test "3D filtration is sorted by birth time then dimension" do
+  test "3D filtration is sorted by birth time, dimension, then vertices" do
     filt = FiltrationBuilder.build(@tet, max_dim: 3)
-    birth_dim_pairs = Enum.map(filt, fn s -> {s.birth, s.dim} end)
-    assert birth_dim_pairs == Enum.sort(birth_dim_pairs)
+    sort_keys = Enum.map(filt, fn s -> {s.birth, s.dim, s.vertices} end)
+    assert sort_keys == Enum.sort(sort_keys)
   end
 
   test "3D filtration has contiguous 0-based indices" do
