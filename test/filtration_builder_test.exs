@@ -147,6 +147,37 @@ defmodule PhNx.FiltrationBuilderTest do
     end
   end
 
+  test "stream/2 max_dim: 0 yields only vertices" do
+    result = FiltrationBuilder.stream(@tri, max_dim: 0) |> Enum.to_list()
+    assert length(result) == 3
+    assert Enum.all?(result, fn s -> s.dim == 0 end)
+    assert Enum.all?(result, fn s -> s.birth == 0.0 end)
+  end
+
+  test "stream/2 raises ArgumentError for negative max_dim" do
+    assert_raise ArgumentError, ~r/max_dim/, fn ->
+      FiltrationBuilder.stream(@tri, max_dim: -1) |> Enum.to_list()
+    end
+  end
+
+  test "stream/2 raises ArgumentError for non-integer max_dim" do
+    assert_raise ArgumentError, ~r/max_dim/, fn ->
+      FiltrationBuilder.stream(@tri, max_dim: 1.5) |> Enum.to_list()
+    end
+  end
+
+  test "stream/2 raises ArgumentError for negative threshold" do
+    assert_raise ArgumentError, ~r/threshold/, fn ->
+      FiltrationBuilder.stream(@tri, threshold: -0.1) |> Enum.to_list()
+    end
+  end
+
+  test "stream/2 raises ArgumentError for empty point cloud" do
+    assert_raise ArgumentError, ~r/non-empty/, fn ->
+      FiltrationBuilder.stream([]) |> Enum.to_list()
+    end
+  end
+
   test "every simplex has required Filtration struct fields" do
     filt = FiltrationBuilder.build(@tet, max_dim: 3)
 
