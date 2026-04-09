@@ -91,6 +91,93 @@ defmodule PhNx.FiltrationBuilderTest do
     assert Enum.all?(filt, fn s -> s.dim <= 2 end)
   end
 
+  # ---------------------------------------------------------------------------
+  # stream/2 tests
+  # ---------------------------------------------------------------------------
+
+  test "stream/2 yields the same number of simplices as build/2" do
+    result = FiltrationBuilder.stream(@tri, max_dim: 2) |> Enum.to_list()
+    assert length(result) == 7
+  end
+
+  test "stream/2 Nx.Tensor input yields same simplices as list input" do
+    list_result =
+      FiltrationBuilder.stream(@tet, max_dim: 3) |> Enum.sort_by(&{&1.birth, &1.dim, &1.vertices})
+
+    tensor_result =
+      FiltrationBuilder.stream(Nx.tensor(@tet, type: :f64), max_dim: 3)
+      |> Enum.sort_by(&{&1.birth, &1.dim, &1.vertices})
+
+    assert list_result == tensor_result
+  end
+
+  test "stream/2 returns a lazy Stream, not a list" do
+    result = FiltrationBuilder.stream(@tri, max_dim: 2)
+    refute is_list(result)
+    assert Enumerable.impl_for(result) != nil
+  end
+
+  test "stream/2 threshold :infinity yields all simplices" do
+    result = FiltrationBuilder.stream(@tri, max_dim: 2, threshold: :infinity) |> Enum.to_list()
+    assert length(result) == 7
+  end
+
+  test "stream/2 threshold filters simplices above birth value" do
+    result = FiltrationBuilder.stream(@tri, max_dim: 2, threshold: 1.0) |> Enum.to_list()
+    assert Enum.all?(result, fn s -> s.birth <= 1.0 end)
+    # 3 vertices + 2 edges with birth=1.0; hypotenuse edge and triangle excluded
+    assert length(result) == 5
+  end
+
+  test "stream/2 max_dim=1 yields only vertices and edges" do
+    result = FiltrationBuilder.stream(@tri, max_dim: 1) |> Enum.to_list()
+    assert Enum.all?(result, fn s -> s.dim <= 1 end)
+    assert length(result) == 6
+  end
+
+  test "stream/2 elements have vertices, dim, birth fields but no index" do
+    result = FiltrationBuilder.stream(@tri, max_dim: 2) |> Enum.to_list()
+
+    for s <- result do
+      assert is_list(s.vertices)
+      assert is_integer(s.dim) and s.dim >= 0
+      assert is_float(s.birth) and s.birth >= 0.0
+      assert length(s.vertices) == s.dim + 1
+      refute Map.has_key?(s, :index)
+    end
+  end
+
+  test "stream/2 max_dim: 0 yields only vertices" do
+    result = FiltrationBuilder.stream(@tri, max_dim: 0) |> Enum.to_list()
+    assert length(result) == 3
+    assert Enum.all?(result, fn s -> s.dim == 0 end)
+    assert Enum.all?(result, fn s -> s.birth == 0.0 end)
+  end
+
+  test "stream/2 raises ArgumentError for negative max_dim" do
+    assert_raise ArgumentError, ~r/max_dim/, fn ->
+      FiltrationBuilder.stream(@tri, max_dim: -1) |> Enum.to_list()
+    end
+  end
+
+  test "stream/2 raises ArgumentError for non-integer max_dim" do
+    assert_raise ArgumentError, ~r/max_dim/, fn ->
+      FiltrationBuilder.stream(@tri, max_dim: 1.5) |> Enum.to_list()
+    end
+  end
+
+  test "stream/2 raises ArgumentError for negative threshold" do
+    assert_raise ArgumentError, ~r/threshold/, fn ->
+      FiltrationBuilder.stream(@tri, threshold: -0.1) |> Enum.to_list()
+    end
+  end
+
+  test "stream/2 raises ArgumentError for empty point cloud" do
+    assert_raise ArgumentError, ~r/non-empty/, fn ->
+      FiltrationBuilder.stream([]) |> Enum.to_list()
+    end
+  end
+
   test "every simplex has required Filtration struct fields" do
     filt = FiltrationBuilder.build(@tet, max_dim: 3)
 
