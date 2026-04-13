@@ -29,7 +29,7 @@ defmodule PhNx do
     - `print_barcode/1`            — print the barcode visualization
     - `most_persistent/1`, `most_persistent/2` — get the most persistent features
     - `betti_numbers/1`            — get Betti numbers for each dimension
-    - `filtration_builder/1`, `filtration_builder/2` — build Vietoris-Rips filtration with options
+    - `filtration_builder/1`, `filtration_builder/2`     — build Vietoris-Rips filtration with options
   """
 
   @spec compute(Nx.Tensor.t() | [[number()]], keyword()) :: PhNx.Persistence.result()
@@ -54,8 +54,9 @@ defmodule PhNx do
 
   @spec reduction(list(PhNx.Filtration.simplex()), keyword()) :: PhNx.BoundaryMatrix.t()
   def reduction(filtration, opts \\ []) do
-    filtration
-    |> PhNx.BoundaryMatrix.build_from_filtration(opts)
-    |> PhNx.BoundaryMatrix.reduce()
+    case opts do
+      [] -> PhNx.Reduction.reduce(filtration)
+      _ -> PhNx.Reduction.reduce(PhNx.BoundaryMatrix.build_from_filtration(filtration, opts))
+    end
   end
 end
