@@ -51,4 +51,11 @@ defmodule PhNx do
 
   @spec filtration_builder(Nx.Tensor.t() | [[number()]], keyword()) :: [PhNx.Filtration.simplex()]
   defdelegate filtration_builder(points, opts), to: PhNx.FiltrationBuilder, as: :build
+
+  @spec reduction(list(PhNx.Filtration.simplex()), keyword()) :: PhNx.BoundaryMatrix.t()
+  def reduction(filtration, opts \\ []) do
+    filtration
+    |> PhNx.BoundaryMatrix.build_from_filtration(opts)
+    |> PhNx.BoundaryMatrix.reduce()
+  end
 end
