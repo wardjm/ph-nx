@@ -27,6 +27,14 @@ defmodule PhNx.ReductionTest do
       assert reduced_bm.reduced
       assert reduced_bm.pairs != []
     end
+
+    test "reduces a filtration with options" do
+      filtration = PhNx.Filtration.build(@points, 1)
+      reduced_bm = PhNx.reduction(filtration, seed_apparent: false)
+
+      assert reduced_bm.reduced
+      assert reduced_bm.pairs != []
+    end
   end
 
   describe "regression: reduction with pre-seeded apparent pairs" do
