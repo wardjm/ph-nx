@@ -28,6 +28,7 @@ defmodule PhNx.Reduction do
   end
 
   def reduce(other) do
-    raise ArgumentError, "PhNx.Reduction.reduce/1 expects a BoundaryMatrix or a list of simplices, but got #{inspect(other)}"
+    raise ArgumentError,
+          "PhNx.Reduction.reduce/1 expects a BoundaryMatrix or a list of simplices, but got #{inspect(other)}"
   end
 end
