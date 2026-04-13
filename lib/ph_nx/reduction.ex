@@ -8,25 +8,26 @@ defmodule PhNx.Reduction do
   alias PhNx.BoundaryMatrix
 
   @doc """
-  Reduces a boundary matrix to find persistence pairs.
+  Reduces a boundary matrix or a filtration to find persistence pairs.
 
-  This function takes a boundary matrix (which may or may or not have been pre-seeded
-  with apparent pairs) and performs the standard column-reduction algorithm.
+  If a `BoundaryMatrix` is provided, it performs the standard column-reduction algorithm.
+  If a filtration (list of simplices) is provided, it first builds the boundary matrix
+  from the filtration and then performs the reduction.
 
   Returns the reduced boundary matrix.
   """
-  @spec reduce(BoundaryMatrix.t()) :: BoundaryMatrix.t()
+  @spec reduce(BoundaryMatrix.t() | list(PhNx.Filtration.simplex())) :: BoundaryMatrix.t()
   def reduce(%BoundaryMatrix{} = bm) do
     BoundaryMatrix.reduce(bm)
   end
 
-  @doc """
-  Reduces a filtration directly, returning the reduced boundary matrix.
-  """
-  @spec reduce(list(PhNx.Filtration.simplex())) :: BoundaryMatrix.t()
-  def reduce(filtration) do
+  def reduce(filtration) when is_list(filtration) do
     filtration
     |> BoundaryMatrix.build_from_filtration()
     |> BoundaryMatrix.reduce()
+  end
+
+  def reduce(other) do
+    raise ArgumentError, "PhNx.Reduction.reduce/1 expects a BoundaryMatrix or a list of simplices, but got #{inspect(other)}"
   end
 end
