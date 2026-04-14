@@ -12,7 +12,11 @@ defmodule PhNx.Topology do
   alias PhNx.{Distance, FiltrationBuilder, Reduction, BoundaryMatrix}
 
   @typedoc "Options accepted by `compute/2`."
-  @type options :: [max_dim: non_neg_integer(), threshold: number() | :infinity]
+  @type options :: [
+          max_dim: non_neg_integer(),
+          threshold: number() | :infinity,
+          boundary_builder: (list(), keyword() -> BoundaryMatrix.t())
+        ]
 
   @doc """
   Compute persistent homology for a point cloud.
@@ -37,7 +41,7 @@ defmodule PhNx.Topology do
       raise ArgumentError, "max_dim must be a non-negative integer, got: #{inspect(max_dim)}"
     end
 
-    if points == [] or (is_list(points) and length(points) == 0) do
+    if points == [] do
       raise ArgumentError, "point cloud must be non-empty"
     end
 
@@ -69,8 +73,8 @@ defmodule PhNx.Topology do
             "boundary_builder must be a 2-arity function, got: #{inspect(builder)}"
     end
 
-    builder_opts = opts |> Keyword.delete(:boundary_builder) |> Keyword.delete(:threshold)
-    reduced = builder.(filtration, builder_opts) |> BoundaryMatrix.reduce()
+    builder_opts = Keyword.delete(opts, :boundary_builder)
+    reduced = builder.(filtration, builder_opts) |> Reduction.reduce()
     raw_pairs = BoundaryMatrix.pairs(reduced)
     raw_essential = BoundaryMatrix.essential(reduced)
 

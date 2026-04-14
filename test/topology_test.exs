@@ -74,6 +74,23 @@ defmodule PhNx.TopologyTest do
         PhNx.Topology.compute(@square, threshold: -1.0)
       end
     end
+
+    test "accepts custom :boundary_builder and passes opts through" do
+      test_pid = self()
+
+      custom_builder = fn filtration, opts ->
+        send(test_pid, {:builder_called, length(filtration), opts})
+        PhNx.BoundaryMatrix.build_from_filtration(filtration, opts)
+      end
+
+      result = PhNx.Topology.compute(@square, boundary_builder: custom_builder)
+
+      assert_received {:builder_called, _, received_opts}
+      refute Keyword.has_key?(received_opts, :boundary_builder)
+      assert Map.has_key?(result, :pairs)
+      assert Map.has_key?(result, :essential)
+      assert Map.has_key?(result, :diagram)
+    end
   end
 
   describe "PhNx.compute/2 public API" do
@@ -90,6 +107,7 @@ defmodule PhNx.TopologyTest do
 
       assert result_facade.pairs == result_topology.pairs
       assert result_facade.essential == result_topology.essential
+      assert result_facade.diagram == result_topology.diagram
     end
   end
 end
