@@ -17,11 +17,13 @@ defmodule PhNx do
       Distance matrix  →  Vietoris-Rips filtration  →  Boundary matrix  →  Column reduction  →  Persistence pairs
 
   Modules:
-    - `PhNx.Distance`       — Nx-powered pairwise Euclidean distance matrix
-    - `PhNx.Filtration`     — Vietoris-Rips filtration construction
-    - `PhNx.FiltrationBuilder` — convenient wrapper for building filtrations with options
-    - `PhNx.BoundaryMatrix` — sparse boundary matrix over F₂, including column reduction
-    - `PhNx.Persistence`    — high-level API and output formatting
+    - `PhNx.Distance`          — Nx-powered pairwise Euclidean distance matrix
+    - `PhNx.FiltrationBuilder` — Vietoris-Rips filtration with options
+    - `PhNx.Reduction`         — sparse F₂ boundary matrix reduction
+    - `PhNx.Topology`          — façade orchestrating Distance → FiltrationBuilder → Reduction
+    - `PhNx.Filtration`        — low-level filtration construction
+    - `PhNx.BoundaryMatrix`    — sparse boundary matrix over F₂
+    - `PhNx.Persistence`       — output formatting helpers
 
   ## Functions
 
@@ -33,7 +35,7 @@ defmodule PhNx do
   """
 
   @spec compute(Nx.Tensor.t() | [[number()]], keyword()) :: PhNx.Persistence.result()
-  defdelegate compute(points, opts \\ []), to: PhNx.Persistence
+  defdelegate compute(points, opts \\ []), to: PhNx.Topology
 
   @spec print_barcode(PhNx.Persistence.result()) :: :ok
   defdelegate print_barcode(result), to: PhNx.Persistence
