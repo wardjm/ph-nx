@@ -37,6 +37,46 @@ defmodule PhNx.ReductionTest do
     end
   end
 
+  describe "PhNx.Reduction.reduce/2 with coeff: :z2" do
+    test "explicit :z2 gives same pairs as default" do
+      filtration = PhNx.Filtration.build(@points, 1)
+
+      default_pairs = Reduction.reduce(filtration) |> BoundaryMatrix.pairs()
+      z2_pairs = Reduction.reduce(filtration, coeff: :z2) |> BoundaryMatrix.pairs()
+
+      assert z2_pairs == default_pairs
+    end
+
+    test "accepts BoundaryMatrix input with coeff: :z2" do
+      filtration = PhNx.Filtration.build(@points, 1)
+      bm = BoundaryMatrix.build_from_filtration(filtration, seed_apparent: false)
+
+      reduced = Reduction.reduce(bm, coeff: :z2)
+
+      assert reduced.reduced
+      assert reduced.pairs != []
+    end
+  end
+
+  describe "PhNx.Reduction.reduce/2 with coeff: {:zp, p}" do
+    test "reduces a filtration over Z3 and returns a reduced matrix" do
+      filtration = PhNx.Filtration.build(@points, 1)
+
+      reduced = Reduction.reduce(filtration, coeff: {:zp, 3})
+
+      assert reduced.reduced
+    end
+
+    test "Z3 produces the same persistence pairs as Z2 for a simple triangle" do
+      filtration = PhNx.Filtration.build(@points, 1)
+
+      z2_pairs = Reduction.reduce(filtration, coeff: :z2) |> BoundaryMatrix.pairs()
+      z3_pairs = Reduction.reduce(filtration, coeff: {:zp, 3}) |> BoundaryMatrix.pairs()
+
+      assert MapSet.new(z2_pairs) == MapSet.new(z3_pairs)
+    end
+  end
+
   describe "regression: reduction with pre-seeded apparent pairs" do
     test "respects apparent pairs and completes reduction" do
       filtration = PhNx.Filtration.build(@points, 1)
