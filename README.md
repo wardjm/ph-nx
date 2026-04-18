@@ -25,6 +25,9 @@ H0 (4 bars):
 
 H1 (1 bar):
   [1.0000, 1.4142)  persistence: 0.4142
+
+H2 (1 bar):
+  [1.4142, ∞)
 ```
 
 ## Installation
@@ -59,8 +62,10 @@ result = PhNx.compute(points, max_dim: 2)
 # => %{pairs: [{dim, birth, death}], essential: [{dim, birth}], diagram: [...]}
 
 PhNx.print_barcode(result)
-PhNx.betti_numbers(result)     # => %{0 => 1, 1 => 0}
-PhNx.most_persistent(result, 5) # => [{dim, birth, death, persistence}, ...]
+PhNx.betti_numbers(result)          # => %{0 => 1, 1 => 0}
+PhNx.most_persistent(result, 5)     # => [{dim, birth, death, persistence}, ...]
+PhNx.filtration_builder(points)     # => [{vertices, birth}, ...]
+PhNx.filtration_builder(points, max_dim: 1)
 ```
 
 ### Options for `compute/2`
@@ -69,14 +74,17 @@ PhNx.most_persistent(result, 5) # => [{dim, birth, death, persistence}, ...]
 |---|---|---|
 | `:max_dim` | `2` | Maximum simplex dimension. To detect Hₖ features you need simplices up to dimension k+1. |
 | `:threshold` | enclosing radius | Ignore simplices born after this filtration value. The enclosing radius is the smallest value at which all points are connected. Pass `:infinity` to include all simplices. |
+| `:boundary_builder` | `BoundaryMatrix.build_from_filtration/2` | Override the boundary matrix constructor. Useful for testing and alternative implementations. Must be a 2-arity function `(filtration, opts) -> BoundaryMatrix.t()`. |
 
 ## Modules
 
 | Module | Responsibility |
 |---|---|
-| `PhNx` | Public API (`compute/2`, `print_barcode/1`, `betti_numbers/1`, `most_persistent/2`) |
+| `PhNx` | Public API (`compute/2`, `print_barcode/1`, `betti_numbers/1`, `most_persistent/2`, `filtration_builder/1,2`, `reduction/1,2`) |
+| `PhNx.Topology` | Façade orchestrating Distance → FiltrationBuilder → Reduction |
 | `PhNx.Distance` | Nx-powered pairwise Euclidean distance matrix |
-| `PhNx.Filtration` | Vietoris-Rips filtration construction |
+| `PhNx.FiltrationBuilder` | Vietoris-Rips filtration with options |
+| `PhNx.Filtration` | Low-level filtration construction |
 | `PhNx.BoundaryMatrix` | Sparse boundary matrix over F₂ |
 | `PhNx.Reduction` | Standard persistence algorithm (column reduction) |
 | `PhNx.Persistence` | Pairs extraction, barcode formatting |
@@ -115,6 +123,9 @@ H0 (4 bars):
 
 H1 (1 bar):
   [1.0000, 1.4142)  persistence: 0.4142
+
+H2 (1 bar):
+  [1.4142, ∞)
 
 Betti numbers:
   β0 = 1
