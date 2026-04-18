@@ -179,5 +179,19 @@ defmodule PhNx.CLITest do
       File.rm(path)
       assert output =~ "Computing"
     end
+
+    test "respects --threshold option" do
+      path =
+        tmp_file("0.0,0.0\n1.0,0.0\n1.0,1.0\n0.0,1.0\n")
+
+      output =
+        capture_io(fn ->
+          PhNx.CLI.main([path, "--threshold", "0.5"])
+        end)
+
+      File.rm(path)
+      assert output =~ "Computing persistent homology for 4 points in 2D"
+      assert output =~ "Betti numbers"
+    end
   end
 end
