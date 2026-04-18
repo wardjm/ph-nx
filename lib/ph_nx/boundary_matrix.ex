@@ -21,6 +21,10 @@ defmodule PhNx.BoundaryMatrix do
   not part of the public API. The matrix is stored sparsely as a map of column
   index to the set of nonzero row indices; an apparent-pairs pre-pass seeds
   the pivot map before the standard column-reduction loop runs.
+
+  For coefficient rings other than ℤ₂ (specified via `coeff: {:zp, p}`), columns
+  are stored as maps from row index to coefficient, and reduction uses modular
+  scalar arithmetic instead of XOR.
   """
 
   alias PhNx.Filtration
@@ -29,6 +33,8 @@ defmodule PhNx.BoundaryMatrix do
   # Use pairs/1, essential/1, and as_tensor/2 to access results.
   @opaque t :: %__MODULE__{
             columns: %{optional(non_neg_integer()) => MapSet.t(non_neg_integer())},
+            zp_columns: %{optional(non_neg_integer()) => %{optional(non_neg_integer()) => pos_integer()}},
+            coeff_ring: :z2 | {:zp, pos_integer()},
             size: non_neg_integer(),
             pivot_col: %{optional(non_neg_integer()) => non_neg_integer()},
             pairs: [{non_neg_integer(), non_neg_integer()}],
@@ -40,6 +46,8 @@ defmodule PhNx.BoundaryMatrix do
   @type column_result :: :already_resolved | :zero | :paired
 
   defstruct columns: %{},
+            zp_columns: %{},
+            coeff_ring: :z2,
             size: 0,
             pivot_col: %{},
             pairs: [],
@@ -59,13 +67,19 @@ defmodule PhNx.BoundaryMatrix do
   Options:
     * `seed_apparent: false` — skip the apparent-pairs pre-pass. Produces a
       bare matrix useful for testing reduction without the pre-pass optimisation.
+    * `coeff: :z2` — use ℤ₂ coefficients (default).
+    * `coeff: {:zp, p}` — use ℤₚ coefficients with signed boundary operators.
+      The apparent-pairs pre-pass is skipped for non-ℤ₂ rings.
   """
   @spec build_from_filtration([Filtration.simplex()], keyword()) :: t()
   def build_from_filtration(filtration, opts \\ []) do
-    from_filtration(filtration, opts)
+    case Keyword.get(opts, :coeff, :z2) do
+      :z2 -> from_filtration(filtration, Keyword.delete(opts, :coeff))
+      {:zp, p} -> from_filtration_zp(filtration, p)
+    end
   end
 
-  defp from_filtration(filtration, opts \\ []) do
+  defp from_filtration(filtration, opts) do
     seed_apparent = Keyword.get(opts, :seed_apparent, true)
     index_map = Filtration.index_map(filtration)
     columns = build_columns(filtration, index_map)
@@ -87,11 +101,25 @@ defmodule PhNx.BoundaryMatrix do
     end
   end
 
+  defp from_filtration_zp(filtration, p) do
+    index_map = Filtration.index_map(filtration)
+    zp_cols = build_zp_columns(filtration, index_map, p)
+    %__MODULE__{zp_columns: zp_cols, size: length(filtration), coeff_ring: {:zp, p}}
+  end
+
   @doc """
   Return the lowest (maximum) row index in column `col`, or `nil` if the column is zero.
   """
   @spec lowest(t(), non_neg_integer()) :: non_neg_integer() | nil
-  def lowest(%__MODULE__{columns: cols}, col), do: col_lowest(cols, col)
+  def lowest(%__MODULE__{coeff_ring: :z2, columns: cols}, col), do: col_lowest(cols, col)
+
+  def lowest(%__MODULE__{coeff_ring: {:zp, _}, zp_columns: zp_cols}, col) do
+    case Map.get(zp_cols, col) do
+      nil -> nil
+      m when map_size(m) == 0 -> nil
+      m -> Enum.max(Map.keys(m))
+    end
+  end
 
   @doc """
   Convert the sparse boundary matrix to a dense Nx tensor for inspection/visualization.
@@ -127,10 +155,20 @@ defmodule PhNx.BoundaryMatrix do
   """
   @spec reduce(t()) :: t()
   @spec reduce([Filtration.simplex()]) :: t()
-  def reduce(%__MODULE__{size: size} = bm) do
+  def reduce(%__MODULE__{coeff_ring: :z2, size: size} = bm) do
     result =
       Enum.reduce(0..(size - 1)//1, bm, fn col, acc ->
         {_result, acc} = reduce_column(acc, col)
+        acc
+      end)
+
+    %{result | reduced: true}
+  end
+
+  def reduce(%__MODULE__{coeff_ring: {:zp, p}, size: size} = bm) do
+    result =
+      Enum.reduce(0..(size - 1)//1, bm, fn col, acc ->
+        {_result, acc} = do_reduce_zp_column(acc, col, p)
         acc
       end)
 
@@ -219,6 +257,38 @@ defmodule PhNx.BoundaryMatrix do
     end
   end
 
+  defp do_reduce_zp_column(%__MODULE__{zp_columns: zp_cols} = bm, col, p) do
+    case zp_lowest(zp_cols, col) do
+      nil ->
+        {:zero, bm}
+
+      {low, c_current} ->
+        case Map.get(bm.pivot_col, low) do
+          nil ->
+            new_bm = %{
+              bm
+              | pivot_col: Map.put(bm.pivot_col, low, col),
+                pairs: [{low, col} | bm.pairs]
+            }
+
+            {:paired, new_bm}
+
+          pivot_col_j ->
+            c_pivot = get_in(zp_cols, [pivot_col_j, low])
+            # scalar r: c_current + r * c_pivot ≡ 0 (mod p)
+            r = Integer.mod(p - Integer.mod(c_current * mod_inverse(c_pivot, p), p), p)
+            new_col = add_cols_zp(Map.get(zp_cols, col, %{}), Map.get(zp_cols, pivot_col_j, %{}), r, p)
+
+            new_zp_cols =
+              if map_size(new_col) == 0,
+                do: Map.delete(zp_cols, col),
+                else: Map.put(zp_cols, col, new_col)
+
+            do_reduce_zp_column(%{bm | zp_columns: new_zp_cols}, col, p)
+        end
+    end
+  end
+
   # ── Private helpers ────────────────────────────────────────────────────────
 
   defp build_columns(filtration, index_map) do
@@ -235,6 +305,27 @@ defmodule PhNx.BoundaryMatrix do
           |> MapSet.new()
 
         Map.put(acc, j, face_indices)
+      end
+    end)
+  end
+
+  defp build_zp_columns(filtration, index_map, p) do
+    Enum.reduce(filtration, %{}, fn %{index: j, dim: dim, vertices: verts}, acc ->
+      if dim == 0 do
+        acc
+      else
+        col =
+          verts
+          |> Enum.with_index()
+          |> Enum.into(%{}, fn {_, k} ->
+            face_verts = List.delete_at(verts, k)
+            face_idx = Map.fetch!(index_map, face_verts)
+            # face k has boundary coefficient (-1)^k: even → 1, odd → p-1
+            coeff = if rem(k, 2) == 0, do: 1, else: p - 1
+            {face_idx, coeff}
+          end)
+
+        Map.put(acc, j, col)
       end
     end)
   end
@@ -271,6 +362,16 @@ defmodule PhNx.BoundaryMatrix do
     end
   end
 
+  defp zp_lowest(zp_cols, col) do
+    case Map.get(zp_cols, col) do
+      nil -> nil
+      m when map_size(m) == 0 -> nil
+      m ->
+        row = Enum.max(Map.keys(m))
+        {row, Map.fetch!(m, row)}
+    end
+  end
+
   defp xor_columns(columns, dst, src) do
     col_dst = Map.get(columns, dst, MapSet.new())
     col_src = Map.get(columns, src, MapSet.new())
@@ -281,19 +382,52 @@ defmodule PhNx.BoundaryMatrix do
       else: Map.put(columns, dst, result)
   end
 
+  defp add_cols_zp(col_a, col_b, scalar, p) do
+    all_rows = Enum.uniq(Map.keys(col_a) ++ Map.keys(col_b))
+
+    Enum.reduce(all_rows, %{}, fn row, acc ->
+      val = Integer.mod(Map.get(col_a, row, 0) + scalar * Map.get(col_b, row, 0), p)
+      if val == 0, do: acc, else: Map.put(acc, row, val)
+    end)
+  end
+
+  defp mod_inverse(a, p) do
+    # Fermat's little theorem: a^(p-2) ≡ a⁻¹ (mod p) for prime p
+    pow_mod(a, p - 2, p)
+  end
+
+  defp pow_mod(_base, 0, _mod), do: 1
+
+  defp pow_mod(base, exp, mod) do
+    if rem(exp, 2) == 0 do
+      half = pow_mod(base, div(exp, 2), mod)
+      Integer.mod(half * half, mod)
+    else
+      Integer.mod(base * pow_mod(base, exp - 1, mod), mod)
+    end
+  end
+
   # Invariant: keys(pivot_col) = apparent-pair births ∪ reduction-found births.
   # Apparent pairs seed pivot_col in build_from_filtration/2; reduction pairs add to pivot_col
   # in do_reduce_column/2. Both paths land in pivot_col, so a single membership check
   # here covers all paired births.
   # ap_resolved additionally excludes apparent-pair death columns, which can remain in
   # bm.columns when the death index is also a birth in another pair.
-  defp do_essential(%__MODULE__{size: size} = bm) do
+  defp do_essential(%__MODULE__{coeff_ring: :z2, size: size} = bm) do
     pivot_rows = MapSet.new(Map.keys(bm.pivot_col))
 
     Enum.filter(0..(size - 1)//1, fn i ->
       not Map.has_key?(bm.columns, i) and
         not MapSet.member?(pivot_rows, i) and
         not MapSet.member?(bm.ap_resolved, i)
+    end)
+  end
+
+  defp do_essential(%__MODULE__{coeff_ring: {:zp, _}, size: size} = bm) do
+    pivot_rows = MapSet.new(Map.keys(bm.pivot_col))
+
+    Enum.filter(0..(size - 1)//1, fn i ->
+      not Map.has_key?(bm.zp_columns, i) and not MapSet.member?(pivot_rows, i)
     end)
   end
 end
