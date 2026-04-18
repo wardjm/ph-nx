@@ -33,7 +33,9 @@ defmodule PhNx.BoundaryMatrix do
   # Use pairs/1, essential/1, and as_tensor/2 to access results.
   @opaque t :: %__MODULE__{
             columns: %{optional(non_neg_integer()) => MapSet.t(non_neg_integer())},
-            zp_columns: %{optional(non_neg_integer()) => %{optional(non_neg_integer()) => pos_integer()}},
+            zp_columns: %{
+              optional(non_neg_integer()) => %{optional(non_neg_integer()) => pos_integer()}
+            },
             coeff_ring: :z2 | {:zp, pos_integer()},
             size: non_neg_integer(),
             pivot_col: %{optional(non_neg_integer()) => non_neg_integer()},
@@ -277,7 +279,9 @@ defmodule PhNx.BoundaryMatrix do
             c_pivot = get_in(zp_cols, [pivot_col_j, low])
             # scalar r: c_current + r * c_pivot ≡ 0 (mod p)
             r = Integer.mod(p - Integer.mod(c_current * mod_inverse(c_pivot, p), p), p)
-            new_col = add_cols_zp(Map.get(zp_cols, col, %{}), Map.get(zp_cols, pivot_col_j, %{}), r, p)
+
+            new_col =
+              add_cols_zp(Map.get(zp_cols, col, %{}), Map.get(zp_cols, pivot_col_j, %{}), r, p)
 
             new_zp_cols =
               if map_size(new_col) == 0,
@@ -364,8 +368,12 @@ defmodule PhNx.BoundaryMatrix do
 
   defp zp_lowest(zp_cols, col) do
     case Map.get(zp_cols, col) do
-      nil -> nil
-      m when map_size(m) == 0 -> nil
+      nil ->
+        nil
+
+      m when map_size(m) == 0 ->
+        nil
+
       m ->
         row = Enum.max(Map.keys(m))
         {row, Map.fetch!(m, row)}
