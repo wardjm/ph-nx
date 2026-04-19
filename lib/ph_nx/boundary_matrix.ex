@@ -186,8 +186,8 @@ defmodule PhNx.BoundaryMatrix do
     %{result | reduced: true}
   end
 
-  def reduce(filtration, _opts) when is_list(filtration) do
-    filtration |> build_from_filtration() |> reduce()
+  def reduce(filtration, opts) when is_list(filtration) do
+    filtration |> build_from_filtration() |> reduce(opts)
   end
 
   @doc """

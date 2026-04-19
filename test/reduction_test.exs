@@ -132,5 +132,14 @@ defmodule PhNx.ReductionTest do
 
       assert_received :progress
     end
+
+    test "BoundaryMatrix.reduce/2 filtration overload forwards opts" do
+      filtration = PhNx.Filtration.build(@points, 1)
+      me = self()
+
+      BoundaryMatrix.reduce(filtration, on_progress: fn p -> send(me, {:progress, p}) end)
+
+      assert_received {:progress, _}
+    end
   end
 end

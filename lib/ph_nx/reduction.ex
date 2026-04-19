@@ -16,6 +16,13 @@ defmodule PhNx.Reduction do
   from the filtration and then performs the reduction.
 
   Returns the reduced boundary matrix.
+
+  ## Options
+
+  - `:on_progress` — a 1-arity callback invoked once per column during reduction.
+    Receives `%{current: non_neg_integer(), total: pos_integer()}`.
+  - `:coeff` — coefficient ring; `{:zp, p}` for ℤₚ arithmetic (default: ℤ₂).
+  - `:seed_apparent` — when `true`, seeds apparent pairs before reduction (default: `false`).
   """
   @spec reduce(BoundaryMatrix.t() | list(PhNx.Filtration.simplex()), keyword()) ::
           BoundaryMatrix.t()
