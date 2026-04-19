@@ -90,4 +90,56 @@ defmodule PhNx.ReductionTest do
       assert reduced_bm.pairs != []
     end
   end
+
+  describe "on_progress callback" do
+    test "is invoked at least once during reduction" do
+      filtration = PhNx.Filtration.build(@points, 1)
+      me = self()
+
+      Reduction.reduce(filtration, on_progress: fn _p -> send(me, :progress) end)
+
+      assert_received :progress
+    end
+
+    test "is called once per column with correct current and total" do
+      filtration = PhNx.Filtration.build(@points, 1)
+      me = self()
+
+      Reduction.reduce(filtration, on_progress: fn p -> send(me, {:progress, p}) end)
+
+      calls =
+        Stream.repeatedly(fn ->
+          receive do
+            {:progress, p} -> p
+          after
+            0 -> nil
+          end
+        end)
+        |> Enum.take_while(&(&1 != nil))
+
+      size = length(filtration)
+      assert length(calls) == size
+      assert Enum.map(calls, & &1.current) == Enum.to_list(0..(size - 1))
+      assert Enum.all?(calls, &(&1.total == size))
+    end
+
+    test "works with a BoundaryMatrix input" do
+      filtration = PhNx.Filtration.build(@points, 1)
+      bm = BoundaryMatrix.build_from_filtration(filtration)
+      me = self()
+
+      Reduction.reduce(bm, on_progress: fn _p -> send(me, :progress) end)
+
+      assert_received :progress
+    end
+
+    test "BoundaryMatrix.reduce/2 filtration overload forwards opts" do
+      filtration = PhNx.Filtration.build(@points, 1)
+      me = self()
+
+      BoundaryMatrix.reduce(filtration, on_progress: fn p -> send(me, {:progress, p}) end)
+
+      assert_received {:progress, _}
+    end
+  end
 end
