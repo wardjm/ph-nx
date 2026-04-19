@@ -16,10 +16,29 @@ defmodule PhNx.Distance do
       iex> PhNx.Distance.euclidean(points)
       #Nx.Tensor<...>
   """
-  @spec euclidean(Nx.Tensor.t()) :: Nx.Tensor.t()
-  def euclidean(points) do
+  @spec euclidean(Nx.Tensor.t(), keyword()) :: Nx.Tensor.t()
+  def euclidean(points, opts \\ []) do
     points = Nx.as_type(points, :f64)
-    euclidean_n(points)
+
+    case resolve_backend(opts) do
+      :gpu -> euclidean_gpu(points)
+      _ -> euclidean_n(points)
+    end
+  end
+
+  defp resolve_backend(opts) do
+    Keyword.get(opts, :backend, Application.get_env(:ph_nx, :distance_backend, :cpu))
+  end
+
+  defp euclidean_gpu(points) do
+    try do
+      Nx.Defn.jit_apply(&euclidean_n/1, [points], compiler: EXLA, client: :cuda)
+    catch
+      _, _ ->
+        require Logger
+        Logger.warning("PhNx.Distance: GPU backend unavailable, falling back to CPU")
+        euclidean_n(points)
+    end
   end
 
   defnp euclidean_n(points) do
