@@ -15,7 +15,8 @@ defmodule PhNx.Topology do
   @type options :: [
           max_dim: non_neg_integer(),
           threshold: number() | :infinity,
-          boundary_builder: (list(), keyword() -> BoundaryMatrix.t())
+          boundary_builder: (list(), keyword() -> BoundaryMatrix.t()),
+          backend: :cpu | :gpu
         ]
 
   @doc """
@@ -28,12 +29,16 @@ defmodule PhNx.Topology do
     - `:boundary_builder` (`(filtration, opts -> BoundaryMatrix.t())`, default:
       `&BoundaryMatrix.build_from_filtration/2`) — override the boundary matrix
       constructor (useful for testing and alternative implementations).
+    - `:backend` (`:cpu` or `:gpu`, default `:cpu`) — distance computation backend.
+      `:gpu` requires EXLA with a CUDA-capable device; falls back to CPU with a
+      warning if the GPU is unavailable. Can also be set globally via
+      `config :ph_nx, distance_backend: :gpu`.
 
   Returns `%{pairs: [...], essential: [...], diagram: [...]}`.
   """
   @spec compute(Nx.Tensor.t() | [[number()]], options()) :: PhNx.Persistence.result()
   def compute(points, opts \\ []) do
-    opts = Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder])
+    opts = Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder, :backend])
 
     max_dim = Keyword.get(opts, :max_dim, 2)
 
@@ -51,7 +56,8 @@ defmodule PhNx.Topology do
       raise ArgumentError, "point cloud must be non-empty"
     end
 
-    dist = Distance.euclidean(points)
+    dist_opts = Keyword.take(opts, [:backend])
+    dist = Distance.euclidean(points, dist_opts)
 
     threshold =
       case Keyword.fetch(opts, :threshold) do

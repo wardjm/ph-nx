@@ -3,12 +3,25 @@ defmodule PhNx.Distance do
   Pairwise distance matrix computation using Nx.
 
   Supports Euclidean distance for point clouds given as n×d tensors (n points, d dimensions).
+
+  ## GPU acceleration
+
+  Pass `backend: :gpu` to `euclidean/2` (or set `config :ph_nx, distance_backend: :gpu`) to
+  JIT-compile via EXLA. The GPU client defaults to `:cuda`; override with
+  `config :ph_nx, gpu_client: :rocm` (or another EXLA client name) for non-CUDA hardware.
+  If the GPU is unavailable, the function logs a warning and falls back to CPU.
   """
 
   import Nx.Defn
 
   @doc """
   Compute the n×n pairwise Euclidean distance matrix for an n×d point cloud.
+
+  ## Options
+
+    - `:backend` (`:cpu` or `:gpu`, default `:cpu`) — computation backend. `:gpu` uses
+      EXLA JIT compilation; falls back to CPU with a warning if the GPU is unavailable.
+      The default backend can be overridden globally via `config :ph_nx, distance_backend: :gpu`.
 
   ## Example
 
@@ -31,14 +44,27 @@ defmodule PhNx.Distance do
   end
 
   defp euclidean_gpu(points) do
+    client = Application.get_env(:ph_nx, :gpu_client, :cuda)
+
     try do
-      Nx.Defn.jit_apply(&euclidean_n/1, [points], compiler: EXLA, client: :cuda)
+      Nx.Defn.jit_apply(&euclidean_n/1, [points], compiler: EXLA, client: client)
+    rescue
+      e in RuntimeError ->
+        gpu_fallback_warning(client, Exception.message(e))
+        euclidean_n(points)
     catch
-      _, _ ->
-        require Logger
-        Logger.warning("PhNx.Distance: GPU backend unavailable, falling back to CPU")
+      :exit, reason ->
+        gpu_fallback_warning(client, inspect(reason))
         euclidean_n(points)
     end
+  end
+
+  defp gpu_fallback_warning(client, detail) do
+    require Logger
+
+    Logger.warning(
+      "PhNx.Distance: GPU backend unavailable, falling back to CPU (client: #{client}): #{detail}"
+    )
   end
 
   defnp euclidean_n(points) do
