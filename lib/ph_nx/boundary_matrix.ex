@@ -156,10 +156,16 @@ defmodule PhNx.BoundaryMatrix do
   default `build_from_filtration/2` options (apparent pairs seeded).
   """
   @spec reduce(t()) :: t()
+  @spec reduce(t(), keyword()) :: t()
   @spec reduce([Filtration.simplex()]) :: t()
-  def reduce(%__MODULE__{coeff_ring: :z2, size: size} = bm) do
+  def reduce(bm_or_filtration, opts \\ [])
+
+  def reduce(%__MODULE__{coeff_ring: :z2, size: size} = bm, opts) do
+    on_progress = Keyword.get(opts, :on_progress)
+
     result =
       Enum.reduce(0..(size - 1)//1, bm, fn col, acc ->
+        if on_progress, do: on_progress.(%{current: col, total: size})
         {_result, acc} = reduce_column(acc, col)
         acc
       end)
@@ -167,9 +173,12 @@ defmodule PhNx.BoundaryMatrix do
     %{result | reduced: true}
   end
 
-  def reduce(%__MODULE__{coeff_ring: {:zp, p}, size: size} = bm) do
+  def reduce(%__MODULE__{coeff_ring: {:zp, p}, size: size} = bm, opts) do
+    on_progress = Keyword.get(opts, :on_progress)
+
     result =
       Enum.reduce(0..(size - 1)//1, bm, fn col, acc ->
+        if on_progress, do: on_progress.(%{current: col, total: size})
         {_result, acc} = do_reduce_zp_column(acc, col, p)
         acc
       end)
@@ -177,7 +186,7 @@ defmodule PhNx.BoundaryMatrix do
     %{result | reduced: true}
   end
 
-  def reduce(filtration) when is_list(filtration) do
+  def reduce(filtration, _opts) when is_list(filtration) do
     filtration |> build_from_filtration() |> reduce()
   end
 

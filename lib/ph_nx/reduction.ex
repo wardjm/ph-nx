@@ -21,14 +21,16 @@ defmodule PhNx.Reduction do
           BoundaryMatrix.t()
   def reduce(input, opts \\ [])
 
-  def reduce(%BoundaryMatrix{} = bm, _opts) do
-    BoundaryMatrix.reduce(bm)
+  def reduce(%BoundaryMatrix{} = bm, opts) do
+    BoundaryMatrix.reduce(bm, opts)
   end
 
   def reduce(filtration, opts) when is_list(filtration) do
+    {progress_opts, build_opts} = Keyword.split(opts, [:on_progress])
+
     filtration
-    |> BoundaryMatrix.build_from_filtration(opts)
-    |> BoundaryMatrix.reduce()
+    |> BoundaryMatrix.build_from_filtration(build_opts)
+    |> BoundaryMatrix.reduce(progress_opts)
   end
 
   def reduce(other, _opts) do
