@@ -143,6 +143,115 @@ defmodule PhNx.Persistence do
   end
 
   @doc """
+  Compute persistent homology for a point cloud, using lazy filtration streaming.
+
+  This function accepts an `Enumerable.t()` of points (e.g. a stream from `IO.stream/2`
+  or a lazy collection), making it suitable for processing large or remote datasets
+  without loading all points into memory before computation begins.
+
+  The distance matrix is still materialised (it requires all points), but the Vietoris-Rips
+  filtration is built lazily via `FiltrationBuilder.stream/2`, keeping peak memory usage
+  lower than the batch `compute/2` for very large point clouds.
+
+  ## Options
+
+  Same as `compute/2`:
+    - `:max_dim` (default `2`)
+    - `:threshold` (default: enclosing radius)
+    - `:boundary_builder` (default: `&BoundaryMatrix.build_from_filtration/2`)
+
+  ## Examples
+
+      iex> stream = Stream.iterate([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], & &1)
+      iex> result = PhNx.Persistence.compute_stream(stream)
+      iex> is_map(result) and Map.has_key?(result, :pairs)
+      true
+  """
+  @spec compute_stream(Enumerable.t(), keyword()) :: result()
+  def compute_stream(points_stream, opts \\ []) do
+    opts = Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder])
+    max_dim = Keyword.get(opts, :max_dim, 2)
+
+    if not is_integer(max_dim) or max_dim < 0 do
+      raise ArgumentError, "max_dim must be a non-negative integer, got: #{inspect(max_dim)}"
+    end
+
+    # Materialise the enumerable into a list so we can inspect it
+    points_list = Enum.to_list(points_stream)
+
+    if points_list == [] do
+      raise ArgumentError, "point cloud must be non-empty"
+    end
+
+    points = Nx.tensor(points_list, type: :f64)
+
+    if Nx.axis_size(points, 0) == 0 do
+      raise ArgumentError, "point cloud must be non-empty"
+    end
+
+    dist = Distance.euclidean(points)
+
+    threshold =
+      Keyword.get_lazy(opts, :threshold, fn -> Distance.enclosing_radius(dist) end)
+
+    unless threshold == :infinity or (is_number(threshold) and threshold >= 0) do
+      raise ArgumentError,
+            "threshold must be :infinity or a non-negative number, got: #{inspect(threshold)}"
+    end
+
+    builder = Keyword.get(opts, :boundary_builder, &BoundaryMatrix.build_from_filtration/2)
+
+    unless is_function(builder, 2) do
+      raise ArgumentError, "boundary_builder must be a 2-arity function, got: #{inspect(builder)}"
+    end
+
+    builder_opts = Keyword.delete(opts, :boundary_builder)
+
+    # Use FiltrationBuilder.stream/2 for lazy filtration generation, then sort
+    # globally (like build/2 does) and add :index fields so the result is
+    # compatible with BoundaryMatrix.build_from_filtration/2
+    filtration =
+      points
+      |> PhNx.FiltrationBuilder.stream(max_dim: max_dim, threshold: threshold)
+      |> Enum.sort_by(fn %{birth: b, dim: d, vertices: v} -> {b, d, v} end)
+      |> Enum.with_index()
+      |> Enum.map(fn {simplex, idx} -> Map.put(simplex, :index, idx) end)
+
+    reduced = builder.(filtration, builder_opts) |> BoundaryMatrix.reduce()
+    raw_pairs = BoundaryMatrix.pairs(reduced)
+    raw_essential = BoundaryMatrix.essential(reduced)
+
+    # Map filtration indices back to (dim, birth) info
+    idx_to_simplex = Map.new(filtration, fn s -> {s.index, s} end)
+
+    pairs =
+      raw_pairs
+      |> Enum.map(fn {i, j} ->
+        s_i = Map.fetch!(idx_to_simplex, i)
+        s_j = Map.fetch!(idx_to_simplex, j)
+        # The homology class lives in dimension = dim of the creator (lower dim simplex)
+        dim = s_i.dim
+        {dim, s_i.birth, s_j.birth}
+      end)
+      |> Enum.filter(fn {_dim, birth, death} -> birth < death end)
+      |> Enum.sort()
+
+    essential =
+      raw_essential
+      |> Enum.map(fn i ->
+        s = Map.fetch!(idx_to_simplex, i)
+        {s.dim, s.birth}
+      end)
+      |> Enum.sort()
+
+    diagram =
+      (pairs ++ Enum.map(essential, fn {d, b} -> {d, b, :infinity} end))
+      |> Enum.sort()
+
+    %{pairs: pairs, essential: essential, diagram: diagram}
+  end
+
+  @doc """
   Print a human-readable barcode summary.
   """
   @spec print_barcode(result()) :: :ok

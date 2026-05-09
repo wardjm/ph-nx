@@ -48,6 +48,12 @@ defmodule PhNx do
           %{optional(non_neg_integer()) => non_neg_integer()}
   defdelegate betti_numbers(result), to: PhNx.Persistence
 
+  @spec compute_stream(Enumerable.t()) :: PhNx.Persistence.result()
+  defdelegate compute_stream(points), to: PhNx.Persistence
+
+  @spec compute_stream(Enumerable.t(), keyword()) :: PhNx.Persistence.result()
+  defdelegate compute_stream(points, opts), to: PhNx.Persistence
+
   @spec filtration_builder(Nx.Tensor.t() | [[number()]]) :: [PhNx.Filtration.simplex()]
   defdelegate filtration_builder(points), to: PhNx.FiltrationBuilder, as: :build
 
