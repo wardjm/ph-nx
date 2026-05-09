@@ -58,6 +58,11 @@ defmodule PhNx.CLI do
         print_usage(:stdio)
         exit({:shutdown, 0})
 
+      opts[:stream] && positional != [] ->
+        IO.puts(:stderr, "Error: --stream and a file argument cannot be combined")
+        print_usage(:stderr)
+        exit({:shutdown, 1})
+
       opts[:stream] ->
         run_stream(opts)
 
@@ -104,15 +109,7 @@ defmodule PhNx.CLI do
     IO.puts("Computing persistent homology for #{length(points)} points in #{dim(points)}D...")
 
     result = PhNx.compute(points, compute_opts)
-    PhNx.print_barcode(result)
-
-    betti = PhNx.betti_numbers(result)
-
-    IO.puts("\nBetti numbers:")
-
-    Enum.each(betti, fn {d, count} ->
-      IO.puts("  β#{d} = #{count}")
-    end)
+    print_results(result)
   end
 
   defp run_stream(opts) do
@@ -126,6 +123,10 @@ defmodule PhNx.CLI do
     IO.puts("Computing persistent homology for #{length(points)} points in #{dim(points)}D...")
 
     result = PhNx.compute_stream(points, compute_opts)
+    print_results(result)
+  end
+
+  defp print_results(result) do
     PhNx.print_barcode(result)
 
     betti = PhNx.betti_numbers(result)
@@ -142,9 +143,15 @@ defmodule PhNx.CLI do
       Stream.unfold(:ok, fn
         :ok ->
           case IO.read(:stdio, :line) do
-            :eof -> nil
-            :error -> nil
-            line -> {String.trim(line), :ok}
+            :eof ->
+              nil
+
+            {:error, reason} ->
+              IO.puts(:stderr, "Error reading stdin: #{inspect(reason)}")
+              exit({:shutdown, 2})
+
+            line ->
+              {String.trim(line), :ok}
           end
       end)
       |> Enum.filter(&(String.trim(&1) != "" and not String.starts_with?(String.trim(&1), "#")))

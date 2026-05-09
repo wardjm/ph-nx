@@ -15,7 +15,7 @@ defmodule PhNx.Persistence do
       PhNx.Persistence.print_barcode(result)
   """
 
-  alias PhNx.{Distance, Filtration, BoundaryMatrix}
+  alias PhNx.{Distance, Filtration, BoundaryMatrix, Reduction}
 
   @typedoc "A finite persistence pair: {dimension, birth, death}."
   @type pair :: {non_neg_integer(), float(), float()}
@@ -162,7 +162,7 @@ defmodule PhNx.Persistence do
 
   ## Examples
 
-      iex> stream = Stream.iterate([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]], & &1)
+      iex> stream = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
       iex> result = PhNx.Persistence.compute_stream(stream)
       iex> is_map(result) and Map.has_key?(result, :pairs)
       true
@@ -184,10 +184,6 @@ defmodule PhNx.Persistence do
     end
 
     points = Nx.tensor(points_list, type: :f64)
-
-    if Nx.axis_size(points, 0) == 0 do
-      raise ArgumentError, "point cloud must be non-empty"
-    end
 
     dist = Distance.euclidean(points)
 
@@ -217,7 +213,7 @@ defmodule PhNx.Persistence do
       |> Enum.with_index()
       |> Enum.map(fn {simplex, idx} -> Map.put(simplex, :index, idx) end)
 
-    reduced = builder.(filtration, builder_opts) |> BoundaryMatrix.reduce()
+    reduced = builder.(filtration, builder_opts) |> Reduction.reduce(builder_opts)
     raw_pairs = BoundaryMatrix.pairs(reduced)
     raw_essential = BoundaryMatrix.essential(reduced)
 

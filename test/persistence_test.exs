@@ -39,10 +39,10 @@ defmodule PhNx.PersistenceTest do
   end
 
   describe "Persistence.compute_stream/2" do
-    test "produces same result as compute/2 for a point cloud" do
+    test "produces same result as PhNx.compute/2 for a point cloud" do
       points = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
 
-      batch_result = Persistence.compute(points)
+      batch_result = PhNx.compute(points)
       stream_result = Persistence.compute_stream(points)
 
       assert batch_result == stream_result
