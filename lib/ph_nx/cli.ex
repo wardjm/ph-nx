@@ -101,29 +101,32 @@ defmodule PhNx.CLI do
           exit({:shutdown, 2})
       end
 
-    compute_opts =
-      []
-      |> maybe_put(:max_dim, opts[:max_dim])
-      |> maybe_put(:threshold, opts[:threshold])
-
-    IO.puts("Computing persistent homology for #{length(points)} points in #{dim(points)}D...")
-
-    result = PhNx.compute(points, compute_opts)
-    print_results(result)
+    compute_and_print(points, opts, &PhNx.compute/2)
   end
 
   defp run_stream(opts) do
-    points = read_stream_points()
+    read_stream_points()
+    |> compute_and_print(opts, &PhNx.compute_stream/2)
+  end
 
+  defp compute_and_print(points, opts, compute) do
     compute_opts =
       []
       |> maybe_put(:max_dim, opts[:max_dim])
       |> maybe_put(:threshold, opts[:threshold])
 
+    # Selecting the backend is deferred until we are about to compute, so that
+    # --help and argument errors never depend on a backend being loadable.
+    case PhNx.Backend.install(PhNx.Backend.select()) do
+      {:fallback, _backend, reason} -> IO.puts(:stderr, "Warning: #{reason}")
+      {:ok, _backend} -> :ok
+    end
+
     IO.puts("Computing persistent homology for #{length(points)} points in #{dim(points)}D...")
 
-    result = PhNx.compute_stream(points, compute_opts)
-    print_results(result)
+    points
+    |> compute.(compute_opts)
+    |> print_results()
   end
 
   defp print_results(result) do
