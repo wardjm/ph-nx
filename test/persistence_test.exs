@@ -38,6 +38,53 @@ defmodule PhNx.PersistenceTest do
     end
   end
 
+  describe "Persistence.compute/2 reduction options" do
+    test "honours :on_progress during reduction" do
+      test_pid = self()
+
+      Persistence.compute(@points,
+        on_progress: fn progress -> send(test_pid, {:progress, progress}) end
+      )
+
+      assert_received {:progress, %{current: 0, total: total}}
+      assert total > 0
+
+      seen =
+        for _ <- 1..(total - 1) do
+          assert_received {:progress, %{current: c, total: ^total}}
+          c
+        end
+
+      assert seen == Enum.to_list(1..(total - 1))
+      refute_received {:progress, _}
+    end
+
+    test ":coeff reaches the boundary matrix, which reduces over Zp" do
+      test_pid = self()
+
+      spy = fn filtration, opts ->
+        bm = BoundaryMatrix.build_from_filtration(filtration, opts)
+        send(test_pid, {:ring, bm.coeff_ring})
+        bm
+      end
+
+      Persistence.compute(@points, coeff: {:zp, 3}, boundary_builder: spy)
+      assert_received {:ring, {:zp, 3}}
+
+      Persistence.compute(@points, boundary_builder: spy)
+      assert_received {:ring, :z2}
+    end
+
+    test "Zp reduction agrees with the default Z2 reduction on the triangle" do
+      assert Persistence.compute(@points, coeff: {:zp, 3}) == Persistence.compute(@points)
+    end
+
+    test "results are unchanged when :on_progress is passed" do
+      assert Persistence.compute(@points, on_progress: fn _ -> :ok end) ==
+               Persistence.compute(@points)
+    end
+  end
+
   describe "Persistence.compute_stream/2" do
     test "produces same result as PhNx.compute/2 for a point cloud" do
       points = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]

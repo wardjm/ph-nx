@@ -75,6 +75,9 @@ PhNx.filtration_builder(points, max_dim: 1)
 | `:max_dim` | `2` | Maximum simplex dimension. To detect Hₖ features you need simplices up to dimension k+1. |
 | `:threshold` | enclosing radius | Ignore simplices born after this filtration value. The enclosing radius is the smallest value at which all points are connected. Pass `:infinity` to include all simplices. |
 | `:boundary_builder` | `BoundaryMatrix.build_from_filtration/2` | Override the boundary matrix constructor. Useful for testing and alternative implementations. Must be a 2-arity function `(filtration, opts) -> BoundaryMatrix.t()`. |
+| `:coeff` | `:z2` | Coefficient ring for the reduction. Pass `{:zp, p}` for ℤₚ arithmetic with signed boundary operators. |
+| `:on_progress` | none | 1-arity callback invoked once per column during reduction, receiving `%{current: non_neg_integer(), total: pos_integer()}`. |
+| `:backend` | `:cpu` | Distance computation backend (`:cpu` or `:gpu`). `PhNx.compute/2` only — not accepted by `PhNx.Persistence.compute/2`. |
 
 ## Modules
 

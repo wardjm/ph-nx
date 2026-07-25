@@ -53,6 +53,9 @@ defmodule PhNx.Persistence do
       `&BoundaryMatrix.build_from_filtration/2`): function used to construct the boundary
       matrix from the filtered simplex list. Override to inject alternative implementations
       (e.g. GPU-accelerated, pre-seeded, or test doubles).
+    - `coeff` — coefficient ring; `{:zp, p}` for ℤₚ arithmetic (default: ℤ₂).
+    - `on_progress` — 1-arity callback invoked once per column during reduction,
+      receiving `%{current: non_neg_integer(), total: pos_integer()}`.
 
   Returns a map:
     %{
@@ -63,7 +66,9 @@ defmodule PhNx.Persistence do
   """
   @spec compute(Nx.Tensor.t() | [[number()]], keyword()) :: result()
   def compute(points, opts \\ []) do
-    opts = Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder])
+    opts =
+      Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder, :coeff, :on_progress])
+
     max_dim = Keyword.get(opts, :max_dim, 2)
 
     if not is_integer(max_dim) or max_dim < 0 do
@@ -102,7 +107,7 @@ defmodule PhNx.Persistence do
     end
 
     builder_opts = Keyword.delete(opts, :boundary_builder)
-    reduced = builder.(filtration, builder_opts) |> BoundaryMatrix.reduce()
+    reduced = builder.(filtration, builder_opts) |> Reduction.reduce(builder_opts)
     raw_pairs = BoundaryMatrix.pairs(reduced)
     raw_essential = BoundaryMatrix.essential(reduced)
 
