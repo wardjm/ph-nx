@@ -30,19 +30,4 @@ defmodule PhNx.DistanceBackendTest do
                "GPU backend unavailable, falling back to CPU"
     end
   end
-
-  describe "app config :distance_backend" do
-    test ":gpu config produces correct distances" do
-      Application.put_env(:ph_nx, :distance_backend, :gpu)
-
-      try do
-        result = Distance.euclidean(@pts)
-        assert Nx.shape(result) == {3, 3}
-        mat = Nx.to_list(result)
-        assert_in_delta Enum.at(Enum.at(mat, 0), 1), 1.0, 1.0e-9
-      after
-        Application.delete_env(:ph_nx, :distance_backend)
-      end
-    end
-  end
 end

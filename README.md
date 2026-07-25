@@ -79,6 +79,41 @@ PhNx.filtration_builder(points, max_dim: 1)
 | `:on_progress` | none | 1-arity callback invoked once per column during reduction, receiving `%{current: non_neg_integer(), total: pos_integer()}`. |
 | `:backend` | `:cpu` | Distance computation backend (`:cpu` or `:gpu`). `PhNx.compute/2` only — not accepted by `PhNx.Persistence.compute/2`. |
 
+## Architecture
+
+Each stage is a deep module behind a small interface, so it can be tested and replaced
+on its own. `PhNx.Topology` is the façade that wires them together and keeps
+`PhNx.compute/2` stable.
+
+```mermaid
+flowchart TD
+    PC["point cloud<br/>Nx.Tensor or [[number]]"] --> API
+    ST["point stream<br/>Enumerable"] --> API
+
+    API["PhNx<br/>compute/2 · compute_stream/2"]
+
+    subgraph PIPE["PhNx.Topology — façade"]
+        direction TB
+        DIST["PhNx.Distance<br/>pairwise Euclidean matrix<br/>:backend"]
+        FILT["PhNx.FiltrationBuilder → PhNx.Filtration<br/>Vietoris-Rips complex<br/>:max_dim · :threshold"]
+        BND["PhNx.BoundaryMatrix<br/>sparse boundary matrix<br/>:coeff · :boundary_builder"]
+        RED["PhNx.Reduction<br/>column reduction → pairs<br/>:coeff · :on_progress"]
+        DIST --> FILT --> BND --> RED
+    end
+
+    API --> DIST
+    RED --> RES["%{pairs, essential, diagram}"]
+    RES --> OUT["PhNx.Persistence<br/>print_barcode/1 · betti_numbers/1 · most_persistent/2"]
+```
+
+Two details the diagram flattens:
+
+- `compute_stream/2` realises the enumerable in full before the distance matrix is
+  built — every point is needed for pairwise distances — and it runs through
+  `PhNx.Persistence`, which reproduces the same stages without the `:backend` option.
+- `:threshold` defaults to the enclosing radius computed from the distance matrix, so
+  the filtration stage depends on the distance stage for more than just its input.
+
 ## Modules
 
 | Module | Responsibility |
