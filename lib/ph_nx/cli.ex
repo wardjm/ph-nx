@@ -5,6 +5,7 @@ defmodule PhNx.CLI do
   ## Usage
 
       ph_nx <file> [options]
+      ph_nx --stream [options]
 
   The file should contain one point per line, with coordinates comma-separated:
 
@@ -15,10 +16,17 @@ defmodule PhNx.CLI do
 
   Points can be in any dimension as long as all points have the same number of coordinates.
 
+  When using `--stream`, points are read from stdin instead of a file. This enables
+  piping data from other commands:
+
+      cat points.csv | ph_nx --stream
+      curl -s https://example.com/points.csv | ph_nx --stream
+
   ## Options
 
       --max-dim N     Maximum homology dimension to compute (default: 2)
       --threshold T   Distance threshold for filtration (default: enclosing radius)
+      --stream        Read points from stdin instead of a file
       --help          Show this help message
 
   ## Building the escript
@@ -30,7 +38,7 @@ defmodule PhNx.CLI do
   def main(args) do
     {opts, positional, invalid} =
       OptionParser.parse(args,
-        strict: [max_dim: :integer, threshold: :float, help: :boolean]
+        strict: [max_dim: :integer, threshold: :float, help: :boolean, stream: :boolean]
       )
 
     cond do
@@ -49,6 +57,14 @@ defmodule PhNx.CLI do
       opts[:help] ->
         print_usage(:stdio)
         exit({:shutdown, 0})
+
+      opts[:stream] && positional != [] ->
+        IO.puts(:stderr, "Error: --stream and a file argument cannot be combined")
+        print_usage(:stderr)
+        exit({:shutdown, 1})
+
+      opts[:stream] ->
+        run_stream(opts)
 
       positional == [] ->
         IO.puts(:stderr, "Error: no input file specified")
@@ -93,6 +109,24 @@ defmodule PhNx.CLI do
     IO.puts("Computing persistent homology for #{length(points)} points in #{dim(points)}D...")
 
     result = PhNx.compute(points, compute_opts)
+    print_results(result)
+  end
+
+  defp run_stream(opts) do
+    points = read_stream_points()
+
+    compute_opts =
+      []
+      |> maybe_put(:max_dim, opts[:max_dim])
+      |> maybe_put(:threshold, opts[:threshold])
+
+    IO.puts("Computing persistent homology for #{length(points)} points in #{dim(points)}D...")
+
+    result = PhNx.compute_stream(points, compute_opts)
+    print_results(result)
+  end
+
+  defp print_results(result) do
     PhNx.print_barcode(result)
 
     betti = PhNx.betti_numbers(result)
@@ -102,6 +136,39 @@ defmodule PhNx.CLI do
     Enum.each(betti, fn {d, count} ->
       IO.puts("  β#{d} = #{count}")
     end)
+  end
+
+  defp read_stream_points() do
+    lines =
+      Stream.unfold(:ok, fn
+        :ok ->
+          case IO.read(:stdio, :line) do
+            :eof ->
+              nil
+
+            {:error, reason} ->
+              IO.puts(:stderr, "Error reading stdin: #{inspect(reason)}")
+              exit({:shutdown, 2})
+
+            line ->
+              {String.trim(line), :ok}
+          end
+      end)
+      |> Enum.filter(&(String.trim(&1) != "" and not String.starts_with?(String.trim(&1), "#")))
+
+    if lines == [] do
+      IO.puts(:stderr, "Error: no data points received on stdin")
+      exit({:shutdown, 2})
+    end
+
+    case parse_points(lines) do
+      {:error, reason} ->
+        IO.puts(:stderr, "Error: #{reason}")
+        exit({:shutdown, 2})
+
+      points ->
+        points
+    end
   end
 
   defp read_points(file) do
@@ -158,9 +225,10 @@ defmodule PhNx.CLI do
   defp print_usage(device) do
     IO.puts(device, """
     Usage: ph_nx <file> [options]
+           ph_nx --stream [options]
 
-    Compute persistent homology from a point cloud file.
-    Each line in the file should be a comma-separated list of coordinates:
+    Compute persistent homology from a point cloud file or stdin stream.
+    Each line in the input should be a comma-separated list of coordinates:
 
         0.0,0.0
         1.0,0.0
@@ -170,6 +238,7 @@ defmodule PhNx.CLI do
     Options:
       --max-dim N     Maximum homology dimension to compute (default: 2)
       --threshold T   Distance threshold for filtration (default: enclosing radius)
+      --stream        Read points from stdin instead of a file
       --help          Show this help message
     """)
   end

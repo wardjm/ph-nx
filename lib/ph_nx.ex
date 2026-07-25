@@ -28,6 +28,7 @@ defmodule PhNx do
   ## Functions
 
     - `compute/1`, `compute/2`     — compute persistent homology of a point cloud
+    - `compute_stream/1`, `compute_stream/2` — stream-based persistent homology of a point cloud
     - `print_barcode/1`            — print the barcode visualization
     - `most_persistent/1`, `most_persistent/2` — get the most persistent features
     - `betti_numbers/1`            — get Betti numbers for each dimension
@@ -47,6 +48,12 @@ defmodule PhNx do
   @spec betti_numbers(PhNx.Persistence.result()) ::
           %{optional(non_neg_integer()) => non_neg_integer()}
   defdelegate betti_numbers(result), to: PhNx.Persistence
+
+  @spec compute_stream(Enumerable.t()) :: PhNx.Persistence.result()
+  defdelegate compute_stream(points), to: PhNx.Persistence
+
+  @spec compute_stream(Enumerable.t(), keyword()) :: PhNx.Persistence.result()
+  defdelegate compute_stream(points, opts), to: PhNx.Persistence
 
   @spec filtration_builder(Nx.Tensor.t() | [[number()]]) :: [PhNx.Filtration.simplex()]
   defdelegate filtration_builder(points), to: PhNx.FiltrationBuilder, as: :build
