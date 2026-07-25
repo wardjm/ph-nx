@@ -9,7 +9,7 @@ defmodule PhNx.Topology do
   Preserves the same `compute/2` signature as `PhNx.Persistence`.
   """
 
-  alias PhNx.{Distance, FiltrationBuilder, Reduction, BoundaryMatrix}
+  alias PhNx.{BoundaryMatrix, Distance, FiltrationBuilder, Reduction}
 
   @typedoc "Options accepted by `compute/2`."
   @type options :: [

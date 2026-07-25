@@ -146,6 +146,17 @@ defmodule PhNx.BoundaryMatrix do
   end
 
   @doc """
+  Returns `true` if `term` is a boundary matrix.
+
+  `t()` is opaque, so callers outside this module cannot pattern-match the
+  struct to dispatch on it — doing so breaks opacity and Dialyzer reports it.
+  This predicate is the supported way to ask.
+  """
+  @spec boundary_matrix?(term()) :: boolean()
+  def boundary_matrix?(%__MODULE__{}), do: true
+  def boundary_matrix?(_term), do: false
+
+  @doc """
   Reduce all columns and return the finished matrix.
 
   This is the full column-reduction loop over all columns. Apparent pairs
@@ -323,23 +334,20 @@ defmodule PhNx.BoundaryMatrix do
   end
 
   defp build_zp_columns(filtration, index_map, p) do
-    Enum.reduce(filtration, %{}, fn %{index: j, dim: dim, vertices: verts}, acc ->
-      if dim == 0 do
-        acc
-      else
-        col =
-          verts
-          |> Enum.with_index()
-          |> Enum.into(%{}, fn {_, k} ->
-            face_verts = List.delete_at(verts, k)
-            face_idx = Map.fetch!(index_map, face_verts)
-            # face k has boundary coefficient (-1)^k: even → 1, odd → p-1
-            coeff = if rem(k, 2) == 0, do: 1, else: p - 1
-            {face_idx, coeff}
-          end)
+    Enum.reduce(filtration, %{}, fn
+      %{dim: 0}, acc -> acc
+      %{index: j, vertices: verts}, acc -> Map.put(acc, j, zp_column(verts, index_map, p))
+    end)
+  end
 
-        Map.put(acc, j, col)
-      end
+  # The boundary of a k-simplex is the alternating sum of its faces: dropping
+  # vertex k contributes coefficient (-1)^k, which in ℤₚ is 1 or p-1.
+  defp zp_column(verts, index_map, p) do
+    verts
+    |> Enum.with_index()
+    |> Enum.into(%{}, fn {_, k} ->
+      face_idx = Map.fetch!(index_map, List.delete_at(verts, k))
+      {face_idx, if(rem(k, 2) == 0, do: 1, else: p - 1)}
     end)
   end
 

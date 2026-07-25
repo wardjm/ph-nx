@@ -141,7 +141,7 @@ defmodule PhNx.CLI do
     end)
   end
 
-  defp read_stream_points() do
+  defp read_stream_points do
     lines =
       Stream.unfold(:ok, fn
         :ok ->

@@ -19,9 +19,23 @@ defmodule PhNx.MixProject do
       ],
       package: [
         licenses: ["MIT"],
-        links: %{"GitHub" => "https://github.com/wardjm/ph-nx"}
+        links: %{"GitHub" => "https://github.com/wardjm/ph-nx"},
+        # Listed explicitly because Hex ships priv/ by default, and priv/plts
+        # holds the (large, machine-specific) Dialyzer PLTs.
+        files: ~w(lib mix.exs mix.lock README.md LICENSE docs)
       ],
       start_permanent: Mix.env() == :prod,
+      # Keep the PLT inside the repo so CI can cache it as a single directory;
+      # a cold build takes several minutes.
+      dialyzer: [
+        plt_local_path: "priv/plts",
+        plt_core_path: "priv/plts",
+        # :mix is needed for the Mix.Task behaviour behind `mix ph_nx`; it is
+        # not a runtime dependency of the library so it is not pulled in
+        # automatically.
+        plt_add_apps: [:mix],
+        flags: [:error_handling, :extra_return, :missing_return]
+      ],
       deps: deps()
     ]
   end
@@ -48,7 +62,9 @@ defmodule PhNx.MixProject do
       # themselves. Keeping it out of :prod also keeps it out of the escript,
       # which cannot load its NIF from inside the archive.
       {:exla, "~> 0.11.0", only: [:dev, :test], runtime: Mix.env() != :test},
-      {:ex_doc, "~> 0.34", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 end

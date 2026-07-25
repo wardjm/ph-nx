@@ -1,7 +1,7 @@
 defmodule PhNx.ErrorConditionsTest do
   use ExUnit.Case, async: true
 
-  alias PhNx.{Distance, Filtration, BoundaryMatrix, Persistence}
+  alias PhNx.{BoundaryMatrix, Distance, Filtration, Persistence}
 
   defp assert_in_range(actual, expected, delta), do: assert_in_delta(actual, expected, delta)
 
@@ -184,7 +184,7 @@ defmodule PhNx.ErrorConditionsTest do
     test "threshold: infinity includes all simplices" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       result = Persistence.compute(pts, max_dim: 1, threshold: :infinity)
-      assert length(result.diagram) > 0
+      assert result.diagram != []
     end
 
     test "large threshold includes all simplices: full PH computed" do
@@ -200,7 +200,7 @@ defmodule PhNx.ErrorConditionsTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]])
       result = Persistence.compute(pts, max_dim: 1, threshold: 0.0)
       assert length(result.essential) == 3
-      assert length(result.pairs) == 0
+      assert result.pairs == []
     end
 
     test "valid multiple calls with same input" do
@@ -228,14 +228,16 @@ defmodule PhNx.ErrorConditionsTest do
     test "zero distance between points handled correctly" do
       pts = Nx.tensor([[0.0, 0.0], [0.0, 0.0], [1.0, 1.0]])
       result = Persistence.compute(pts, max_dim: 2)
-      assert length(result.pairs) >= 0
+      # Duplicate points are degenerate but must not crash the reduction; the
+      # pair count is not pinned because it depends on tie-breaking order.
+      assert is_list(result.pairs)
     end
 
     test "single dimension point cloud" do
       pts = Nx.tensor([[0.0], [1.0], [2.0]])
       result = Persistence.compute(pts, max_dim: 2)
       assert length(result.essential) == 1
-      assert length(Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)) == 0
+      assert Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end) == []
     end
 
     test "very large max_dim" do

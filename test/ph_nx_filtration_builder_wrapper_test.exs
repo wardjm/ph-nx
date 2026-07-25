@@ -25,7 +25,7 @@ defmodule PhNx.FiltrationBuilderWrapperTest do
     test "returns a filtration for a simple point cloud" do
       filtration = PhNx.filtration_builder(@tri)
       assert is_list(filtration)
-      assert length(filtration) > 0
+      assert filtration != []
       assert Enum.all?(filtration, fn s -> is_map(s) and Map.has_key?(s, :birth) end)
     end
 
@@ -70,7 +70,7 @@ defmodule PhNx.FiltrationBuilderWrapperTest do
       points = Nx.tensor(@tri)
       filtration = PhNx.filtration_builder(points, [])
       assert is_list(filtration)
-      assert length(filtration) > 0
+      assert filtration != []
     end
 
     test "accepts Nx.Tensor with options" do
@@ -126,8 +126,8 @@ defmodule PhNx.FiltrationBuilderWrapperTest do
       faces = Enum.filter(filtration, fn s -> s.dim == 2 end)
 
       assert length(vertices) == 4
-      assert length(edges) > 0
-      assert length(faces) > 0
+      assert edges != []
+      assert faces != []
     end
 
     test "unit square with max_dim 1 for TDA pipeline" do

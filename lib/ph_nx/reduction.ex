@@ -28,10 +28,6 @@ defmodule PhNx.Reduction do
           BoundaryMatrix.t()
   def reduce(input, opts \\ [])
 
-  def reduce(%BoundaryMatrix{} = bm, opts) do
-    BoundaryMatrix.reduce(bm, opts)
-  end
-
   def reduce(filtration, opts) when is_list(filtration) do
     {progress_opts, build_opts} = Keyword.split(opts, [:on_progress])
 
@@ -40,8 +36,14 @@ defmodule PhNx.Reduction do
     |> BoundaryMatrix.reduce(progress_opts)
   end
 
-  def reduce(other, _opts) do
-    raise ArgumentError,
-          "PhNx.Reduction.reduce/2 expects a BoundaryMatrix or a list of simplices, but got #{inspect(other)}"
+  # `BoundaryMatrix.t()` is opaque, so this dispatches through the module's own
+  # predicate rather than pattern-matching `%BoundaryMatrix{}` here.
+  def reduce(other, opts) do
+    if BoundaryMatrix.boundary_matrix?(other) do
+      BoundaryMatrix.reduce(other, opts)
+    else
+      raise ArgumentError,
+            "PhNx.Reduction.reduce/2 expects a BoundaryMatrix or a list of simplices, but got #{inspect(other)}"
+    end
   end
 end

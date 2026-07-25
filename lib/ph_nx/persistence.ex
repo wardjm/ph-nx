@@ -15,7 +15,7 @@ defmodule PhNx.Persistence do
       PhNx.Persistence.print_barcode(result)
   """
 
-  alias PhNx.{Distance, Filtration, BoundaryMatrix, Reduction}
+  alias PhNx.{BoundaryMatrix, Distance, Filtration, Reduction}
 
   @typedoc "A finite persistence pair: {dimension, birth, death}."
   @type pair :: {non_neg_integer(), float(), float()}
@@ -75,7 +75,7 @@ defmodule PhNx.Persistence do
       raise ArgumentError, "max_dim must be a non-negative integer, got: #{inspect(max_dim)}"
     end
 
-    if points == [] or (is_list(points) and length(points) == 0) do
+    if points == [] do
       raise ArgumentError, "point cloud must be non-empty"
     end
 
