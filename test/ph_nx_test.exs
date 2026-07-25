@@ -1,7 +1,7 @@
 defmodule PhNxTest do
   use ExUnit.Case, async: true
 
-  alias PhNx.{Distance, Filtration, BoundaryMatrix, Persistence}
+  alias PhNx.{BoundaryMatrix, Distance, Filtration, Persistence}
 
   # ── Distance ────────────────────────────────────────────────────────────────
 
@@ -563,7 +563,7 @@ defmodule PhNxTest do
       h1_finite = Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)
 
       assert length(h0_essential) == 1
-      assert length(h1_finite) >= 1
+      assert h1_finite != []
     end
 
     test "equilateral triangle: H1 loop has zero persistence (born and killed simultaneously)" do

@@ -93,6 +93,18 @@ defmodule PhNx.Distance do
     |> Nx.reduce_max(axes: [1])
     |> Nx.reduce_min()
     |> Nx.to_number()
+    |> as_float()
+  end
+
+  # `Nx.to_number/1` is typed to return integers, complex numbers and the
+  # non-finite atoms as well as floats, depending on the tensor's type and
+  # contents. A radius is always a finite float, so integer-typed matrices are
+  # widened and anything else is rejected with a message that names the value.
+  defp as_float(radius) when is_float(radius), do: radius
+  defp as_float(radius) when is_integer(radius), do: radius * 1.0
+
+  defp as_float(other) do
+    raise ArgumentError, "enclosing radius is not a finite number, got: #{inspect(other)}"
   end
 
   @doc """

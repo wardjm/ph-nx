@@ -41,7 +41,7 @@ defmodule PhNx.TopologyTest do
       # With max_dim: 1 there are no triangles to kill the H1 loop, so it
       # shows up as an essential class (infinite bar) rather than a finite pair.
       h1_essential_dim1 = Enum.filter(result_dim1.essential, fn {d, _} -> d == 1 end)
-      assert length(h1_essential_dim1) >= 1
+      assert h1_essential_dim1 != []
 
       # With max_dim: 2 triangles fill in the loop, producing a finite H1 pair.
       h1_pairs_dim2 = Enum.filter(result_dim2.pairs, fn {d, _, _} -> d == 1 end)

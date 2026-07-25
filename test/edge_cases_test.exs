@@ -1,7 +1,7 @@
 defmodule PhNx.EdgeCasesTest do
   use ExUnit.Case, async: true
 
-  alias PhNx.{Distance, Filtration, BoundaryMatrix, Persistence}
+  alias PhNx.{BoundaryMatrix, Distance, Filtration, Persistence}
 
   defp assert_in_range(actual, expected, delta), do: assert_in_delta(actual, expected, delta)
 
@@ -53,7 +53,7 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0], [1.0], [2.0], [3.0]])
       result = Persistence.compute(pts, max_dim: 2)
       assert length(result.essential) == 1
-      assert length(Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)) == 0
+      assert Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end) == []
     end
 
     test "two points: exactly one edge pair" do
@@ -67,14 +67,14 @@ defmodule PhNx.EdgeCasesTest do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
       result = Persistence.compute(pts, max_dim: 1)
       assert length(result.essential) == 1
-      assert length(Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)) == 0
+      assert Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end) == []
     end
 
     test "three collinear points with max_dim=2" do
       pts = Nx.tensor([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
       result = Persistence.compute(pts, max_dim: 2)
       assert length(result.essential) == 1
-      assert length(Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)) == 0
+      assert Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end) == []
     end
   end
 
@@ -388,8 +388,8 @@ defmodule PhNx.EdgeCasesTest do
       result = Persistence.compute(pts, max_dim: 2)
       h0_pairs = Enum.filter(result.pairs, fn {d, _, _} -> d == 0 end)
       h1_pairs = Enum.filter(result.pairs, fn {d, _, _} -> d == 1 end)
-      assert length(h0_pairs) >= 1
-      assert length(h1_pairs) >= 1
+      assert h0_pairs != []
+      assert h1_pairs != []
     end
   end
 end
