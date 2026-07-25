@@ -5,36 +5,8 @@ set -euo pipefail
 
 export MIX_ENV=test
 
-PASS=0
-FAIL=0
-
-pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
-fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
-
-assert_exit() {
-  local desc="$1" expected="$2"
-  shift 2
-  local actual
-  actual=0
-  "$@" >/dev/null 2>&1 || actual=$?
-  if [ "$actual" -eq "$expected" ]; then pass "$desc"; else fail "$desc (expected exit $expected, got $actual)"; fi
-}
-
-assert_stdout() {
-  local desc="$1" pattern="$2"
-  shift 2
-  local out
-  out=$("$@" 2>/dev/null)
-  if echo "$out" | grep -q "$pattern"; then pass "$desc"; else fail "$desc (pattern '$pattern' not found in output)"; fi
-}
-
-assert_stderr() {
-  local desc="$1" pattern="$2"
-  shift 2
-  local err
-  err=$("$@" 2>&1 >/dev/null || true)
-  if echo "$err" | grep -q "$pattern"; then pass "$desc"; else fail "$desc (pattern '$pattern' not found in stderr)"; fi
-}
+# shellcheck source=test/support/sh_assert.sh
+source "$(dirname "$0")/support/sh_assert.sh"
 
 TMPDIR_CUSTOM=$(mktemp -d)
 cleanup() { rm -rf "$TMPDIR_CUSTOM"; }
@@ -97,6 +69,4 @@ assert_exit   "--max-dim option accepted"     0       mix ph_nx "$SQUARE" --max-
 assert_exit   "--threshold option accepted"   0       mix ph_nx "$SQUARE" --threshold 5.0
 
 # ── summary ─────────────────────────────────────────────────────────────────
-echo ""
-echo "Results: $PASS passed, $FAIL failed"
-[ "$FAIL" -eq 0 ]
+summary

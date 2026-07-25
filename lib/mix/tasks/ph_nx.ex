@@ -25,7 +25,11 @@ defmodule Mix.Tasks.PhNx do
 
   @impl Mix.Task
   def run(args) do
-    Mix.Task.run("app.start")
+    # --no-start so a broken accelerator install cannot abort the task before
+    # the CLI runs; PhNx.Backend starts the backend itself once it has checked
+    # that it is usable, and reports a fallback instead of crashing.
+    Mix.Task.run("app.start", ["--no-start"])
+    Application.ensure_all_started(:nx)
     PhNx.CLI.main(args)
   end
 end

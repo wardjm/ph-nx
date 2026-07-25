@@ -133,6 +133,32 @@ Betti numbers:
 
 Points can be in any dimension as long as all points in the file have the same number of coordinates. The `--max-dim` and `--threshold` options correspond directly to the options for `PhNx.compute/2`.
 
+Points can also be streamed on stdin with `--stream`:
+
+```
+$ cat square.txt | ph_nx --stream
+```
+
+### Standalone escript
+
+```
+$ mix escript.build
+$ ./ph_nx square.txt
+```
+
+The escript is a single self-contained file that needs only an Erlang runtime on the target machine.
+
+### Backends used by the CLI
+
+| Entry point | Backend |
+|---|---|
+| `mix ph_nx` (dev) | `EXLA.Backend`, falling back to `Nx.BinaryBackend` with a warning on stderr if EXLA cannot be loaded |
+| `./ph_nx` (escript) | `Nx.BinaryBackend` |
+
+`mix escript.build` builds with `MIX_ENV=prod`, where EXLA is neither configured nor bundled, so the escript computes on `Nx.BinaryBackend`. An escript is a single archive: the `priv/` directory of `:exla` is never unpacked to disk and its NIF (`libexla.so`) cannot be loaded, so accelerated backends and escripts are mutually exclusive. (Forcing a build with `MIX_ENV=dev` still runs — the CLI detects that EXLA is unusable and falls back with a warning — but gains nothing.)
+
+Results are identical either way; only speed differs. Use `mix ph_nx` or the library API with EXLA configured when acceleration matters.
+
 ## License
 
 MIT — see [LICENSE](LICENSE) for details.
