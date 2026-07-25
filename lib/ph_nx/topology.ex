@@ -16,7 +16,9 @@ defmodule PhNx.Topology do
           max_dim: non_neg_integer(),
           threshold: number() | :infinity,
           boundary_builder: (list(), keyword() -> BoundaryMatrix.t()),
-          backend: :cpu | :gpu
+          backend: :cpu | :gpu,
+          coeff: :z2 | {:zp, pos_integer()},
+          on_progress: (%{current: non_neg_integer(), total: pos_integer()} -> any())
         ]
 
   @doc """
@@ -33,12 +35,23 @@ defmodule PhNx.Topology do
       `:gpu` requires EXLA with a CUDA-capable device; falls back to CPU with a
       warning if the GPU is unavailable. Can also be set globally via
       `config :ph_nx, distance_backend: :gpu`.
+    - `:coeff` — coefficient ring; `{:zp, p}` for ℤₚ arithmetic (default: ℤ₂).
+    - `:on_progress` — 1-arity callback invoked once per column during reduction,
+      receiving `%{current: non_neg_integer(), total: pos_integer()}`.
 
   Returns `%{pairs: [...], essential: [...], diagram: [...]}`.
   """
   @spec compute(Nx.Tensor.t() | [[number()]], options()) :: PhNx.Persistence.result()
   def compute(points, opts \\ []) do
-    opts = Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder, :backend])
+    opts =
+      Keyword.validate!(opts, [
+        :max_dim,
+        :threshold,
+        :boundary_builder,
+        :backend,
+        :coeff,
+        :on_progress
+      ])
 
     max_dim = Keyword.get(opts, :max_dim, 2)
 
@@ -80,7 +93,7 @@ defmodule PhNx.Topology do
     end
 
     builder_opts = Keyword.delete(opts, :boundary_builder)
-    reduced = builder.(filtration, builder_opts) |> Reduction.reduce()
+    reduced = builder.(filtration, builder_opts) |> Reduction.reduce(builder_opts)
     raw_pairs = BoundaryMatrix.pairs(reduced)
     raw_essential = BoundaryMatrix.essential(reduced)
 

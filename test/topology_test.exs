@@ -93,6 +93,49 @@ defmodule PhNx.TopologyTest do
     end
   end
 
+  describe "PhNx.Topology.compute/2 reduction options" do
+    test ":on_progress is invoked once per reduction column" do
+      test_pid = self()
+
+      PhNx.compute(@square, on_progress: fn progress -> send(test_pid, {:progress, progress}) end)
+
+      assert_received {:progress, %{current: 0, total: total}}
+
+      seen =
+        for _ <- 1..(total - 1) do
+          assert_received {:progress, %{current: c, total: ^total}}
+          c
+        end
+
+      assert seen == Enum.to_list(1..(total - 1))
+      refute_received {:progress, _}
+    end
+
+    test ":coeff reaches the boundary matrix, which reduces over Zp" do
+      test_pid = self()
+
+      spy = fn filtration, opts ->
+        bm = PhNx.BoundaryMatrix.build_from_filtration(filtration, opts)
+        send(test_pid, {:ring, bm.coeff_ring})
+        bm
+      end
+
+      PhNx.compute(@square, coeff: {:zp, 3}, boundary_builder: spy)
+      assert_received {:ring, {:zp, 3}}
+
+      PhNx.compute(@square, boundary_builder: spy)
+      assert_received {:ring, :z2}
+    end
+
+    test "Zp reduction agrees with the default Z2 reduction on the square" do
+      assert PhNx.compute(@square, coeff: {:zp, 3}) == PhNx.compute(@square)
+    end
+
+    test "results are unchanged when :on_progress is passed" do
+      assert PhNx.compute(@square, on_progress: fn _ -> :ok end) == PhNx.compute(@square)
+    end
+  end
+
   describe "PhNx.compute/2 public API" do
     test "still works and returns correct result (no breaking change)" do
       result = PhNx.compute(@square)
