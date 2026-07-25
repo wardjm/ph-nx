@@ -54,24 +54,52 @@ defmodule PhNx.PersistenceTest do
       end
     end
 
+    test "accepts a lazy enumerable, not just a list" do
+      points = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+
+      lazy = Stream.map(points, & &1)
+
+      assert Persistence.compute_stream(lazy) == PhNx.compute(points)
+    end
+
     test "accepts options: max_dim" do
       points = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
 
       result = Persistence.compute_stream(points, max_dim: 1)
 
-      assert is_map(result)
-      assert Map.has_key?(result, :pairs)
-      assert Map.has_key?(result, :essential)
-      assert Map.has_key?(result, :diagram)
+      assert result == PhNx.compute(points, max_dim: 1)
+      refute result == Persistence.compute_stream(points, max_dim: 2)
     end
 
     test "accepts options: threshold" do
       points = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
 
-      result = Persistence.compute_stream(points, threshold: 0.5)
+      assert Persistence.compute_stream(points, threshold: 0.5) ==
+               PhNx.compute(points, threshold: 0.5)
+
+      assert Persistence.compute_stream(points, threshold: :infinity) ==
+               PhNx.compute(points, threshold: :infinity)
+    end
+
+    test "honours :on_progress during reduction" do
+      points = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+      test_pid = self()
+
+      Persistence.compute_stream(points,
+        on_progress: fn progress -> send(test_pid, {:progress, progress}) end
+      )
+
+      assert_received {:progress, %{current: _, total: total}}
+      assert total > 0
+    end
+
+    test "honours :coeff for Zp arithmetic" do
+      points = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]]
+
+      result = Persistence.compute_stream(points, coeff: {:zp, 3})
 
       assert is_map(result)
-      assert Map.has_key?(result, :pairs)
+      assert Map.has_key?(result, :diagram)
     end
 
     test "accepts options: boundary_builder" do

@@ -197,6 +197,16 @@ defmodule PhNx.CLITest do
   end
 
   describe "main/1 - streaming mode (--stream)" do
+    test "rejects --stream combined with a file argument" do
+      output =
+        capture_io(:stderr, fn ->
+          assert catch_exit(PhNx.CLI.main(["points.csv", "--stream"])) == {:shutdown, 1}
+        end)
+
+      assert output =~ "--stream and a file argument cannot be combined"
+      assert output =~ "Usage:"
+    end
+
     test "reads points from stdin when --stream is given" do
       input = "0.0,0.0\n1.0,0.0\n1.0,1.0\n0.0,1.0\n"
 

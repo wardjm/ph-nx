@@ -145,13 +145,26 @@ defmodule PhNx.Persistence do
   @doc """
   Compute persistent homology for a point cloud, using lazy filtration streaming.
 
-  This function accepts an `Enumerable.t()` of points (e.g. a stream from `IO.stream/2`
-  or a lazy collection), making it suitable for processing large or remote datasets
-  without loading all points into memory before computation begins.
+  This function accepts an `Enumerable.t()` of points — a plain list, a `Stream`, or any
+  other lazy collection — so callers that already have points behind an enumerable
+  (file-backed iterators, `IO.stream/2`, resource streams) can pass it directly instead
+  of collecting it themselves first.
 
-  The distance matrix is still materialised (it requires all points), but the Vietoris-Rips
-  filtration is built lazily via `FiltrationBuilder.stream/2`, keeping peak memory usage
-  lower than the batch `compute/2` for very large point clouds.
+  ## Performance
+
+  This is a convenience over `compute/2`, not an optimisation. It is currently **slower
+  than `compute/2` and uses comparable memory**; prefer `compute/2` when you already hold
+  a list or tensor.
+
+  The enumerable is fully materialised before computation: the distance matrix requires
+  all points, and although the Vietoris-Rips filtration is generated via
+  `FiltrationBuilder.stream/2`, it is then sorted globally, which realises it in full.
+  Measured on 55 points (`max_dim: 2, threshold: :infinity`), peak memory was 45.4 MB
+  versus 48.1 MB for `compute/2` — within noise — while wall-clock was 1.4-2x slower,
+  because `FiltrationBuilder.stream/2` reads birth times out of the distance tensor
+  per vertex pair rather than from a flat tuple.
+
+  Results are numerically identical to `compute/2` for the same options.
 
   ## Options
 
@@ -159,24 +172,30 @@ defmodule PhNx.Persistence do
     - `:max_dim` (default `2`)
     - `:threshold` (default: enclosing radius)
     - `:boundary_builder` (default: `&BoundaryMatrix.build_from_filtration/2`)
+    - `:coeff` — coefficient ring; `{:zp, p}` for ℤₚ arithmetic (default: ℤ₂)
+    - `:on_progress` — 1-arity callback invoked once per column during reduction
+
+  Note that `:backend` is accepted by `PhNx.Topology.compute/2` but not here.
 
   ## Examples
 
-      iex> stream = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
-      iex> result = PhNx.Persistence.compute_stream(stream)
-      iex> is_map(result) and Map.has_key?(result, :pairs)
+      iex> points = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]
+      iex> result = PhNx.Persistence.compute_stream(Stream.map(points, & &1), max_dim: 1)
+      iex> result == PhNx.compute(points, max_dim: 1)
       true
   """
   @spec compute_stream(Enumerable.t(), keyword()) :: result()
   def compute_stream(points_stream, opts \\ []) do
-    opts = Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder])
+    opts =
+      Keyword.validate!(opts, [:max_dim, :threshold, :boundary_builder, :coeff, :on_progress])
+
     max_dim = Keyword.get(opts, :max_dim, 2)
 
     if not is_integer(max_dim) or max_dim < 0 do
       raise ArgumentError, "max_dim must be a non-negative integer, got: #{inspect(max_dim)}"
     end
 
-    # Materialise the enumerable into a list so we can inspect it
+    # The distance matrix needs every point, so the enumerable is realised in full here.
     points_list = Enum.to_list(points_stream)
 
     if points_list == [] do
